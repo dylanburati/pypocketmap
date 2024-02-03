@@ -16,11 +16,10 @@
 #if KEY_TYPE_TAG == TYPE_TAG_I32
 typedef int32_t k_t;
 typedef int32_t pk_t;
-typedef int32_t const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-static inline uint32_t _hash_func(const_k_t key) { return (uint32_t) key; }
+static inline uint32_t _hash_func(k_t key) { return (uint32_t) key; }
 static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
+static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
     keys[idx] = k;
     return true;
 }
@@ -29,11 +28,10 @@ static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 #elif KEY_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t k_t;
 typedef int64_t pk_t;
-typedef int64_t const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-static inline uint32_t _hash_func(const_k_t key) { return ((uint32_t) key) ^ ((uint32_t) (key >> 32)); }
+static inline uint32_t _hash_func(k_t key) { return ((uint32_t) key) ^ ((uint32_t) (key >> 32)); }
 static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
+static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
     keys[idx] = k;
     return true;
 }
@@ -42,14 +40,13 @@ static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;
 typedef float pk_t;
-typedef float const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-static inline uint32_t _hash_func(const_k_t key) {
+static inline uint32_t _hash_func(k_t key) {
     uint32_t ikey = *((uint32_t*) &key);
     return ikey ^ (ikey >> 16);
 }
 static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
+static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
     keys[idx] = k;
     return true;
 }
@@ -58,63 +55,70 @@ static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 #elif KEY_TYPE_TAG == TYPE_TAG_F64
 typedef double k_t;
 typedef double pk_t;
-typedef double const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-static inline uint32_t _hash_func(const_k_t key) {
+static inline uint32_t _hash_func(k_t key) {
     uint64_t ikey64 = *((uint64_t*) &key);
     uint32_t ikey = ((uint32_t) ikey) ^ ((uint32_t) (ikey >> 32))
     return ikey ^ (ikey >> 16);
 }
 static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
+static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
     keys[idx] = k;
     return true;
 }
 static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_STR
-typedef char* k_t;
-typedef union {
-    struct {
-        char data[15];
-        uint8_t meta;
-    } contained;
-    struct {
-        char* ptr;
+typedef struct {
+    const char* ptr;
+    uint64_t len;
+} k_t;
+typedef struct {
+    char data[15];
+    uint8_t meta;
+} pk_contained;
+typedef struct {
+    char* ptr;
 #if UINTPTR_MAX == 0xffffffff
         uint32_t __pad;
 #endif
-        uint64_t __zero;
-    } spilled;
+    uint64_t meta;
+} pk_spilled;
+typedef union {
+    pk_contained contained;
+    pk_spilled spilled;
 } pk_t;
-typedef const char* const_k_t;
-#define KEY_EQ(a, b) (strcmp((a), (b)) == 0)
+#define KEY_EQ(a, b) ((a.len == b.len) && memcmp(a.ptr, b.ptr, a.len) == 0)
 #include "./wyhash.h"
 const uint64_t transparent_xor[5] = {0, 0, 0, 0, 0};
-static inline uint32_t _hash_func(const_k_t key) {
-    return (uint32_t) (wyhash((void*) key, strlen(key), 1, transparent_xor));
+static inline uint32_t _hash_func(k_t key) {
+    return (uint32_t) (wyhash((void*) key.ptr, key.len, 1, transparent_xor));
 }
 static inline k_t _get_key(pk_t* keys, uint32_t idx) {
-    if (keys[idx].contained.meta) {
-        return keys[idx].contained.data;
+    k_t res;
+    if (keys[idx].contained.meta & 1) {
+        res.ptr = keys[idx].contained.data;
+        res.len = keys[idx].contained.meta >> 1;
+        return res;
     }
-    return keys[idx].spilled.ptr;
+    res.ptr = keys[idx].spilled.ptr;
+    res.len = keys[idx].spilled.meta >> 1;
+    return res;
 }
-static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
-    size_t len = strlen(k);
-    if (len < 15) {
-        memcpy(keys[idx].contained.data, k, len+1);
-        keys[idx].contained.meta = 1;
+static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
+    if (k.len < 15) {
+        memcpy(keys[idx].contained.data, k.ptr, k.len+1);
+        keys[idx].contained.meta = (k.len << 1) | 1;
     } else {
-        keys[idx].spilled.ptr = (char*) malloc(len+1);
+        keys[idx].spilled.ptr = (char*) malloc(k.len+1);
         if (keys[idx].spilled.ptr == NULL) return false;
-        memcpy(keys[idx].spilled.ptr, k, len+1);
-        keys[idx].spilled.__zero = 0;
+        memcpy(keys[idx].spilled.ptr, k.ptr, k.len+1);
+        keys[idx].spilled.meta = k.len << 1;
     }
     return true;
 }
 static inline void _unset_key(pk_t* keys, uint32_t idx) {
-    if (!keys[idx].contained.meta) {
+    if (!(keys[idx].contained.meta & 1)) {
         free(keys[idx].spilled.ptr);
     }
 }
@@ -200,7 +204,7 @@ static void mdict_destroy(h_t *h) {
     }
 }
 
-static inline int32_t _mdict_read_index(h_t *h, const_k_t key, uint32_t hash_upper, uint32_t h2) {
+static inline int32_t _mdict_read_index(h_t *h, k_t key, uint32_t hash_upper, uint32_t h2) {
     const uint32_t step_basis = GROUP_WIDTH >> 3;
     uint32_t mask = _flags_size(h->num_buckets) - 1;
     mask &= ~(step_basis - 1);  // e.g. mask should select 0,2,4,6 if 64 buckets, flags_size 8, num_groups 4
@@ -328,7 +332,7 @@ static void mdict_clear(h_t *h) {
     h->num_deleted = 0;
 }
 
-static inline bool mdict_set(h_t *h, const_k_t key, v_t val, v_t* val_box, bool should_replace) {
+static inline bool mdict_set(h_t *h, k_t key, v_t val, v_t* val_box, bool should_replace) {
     if (h->size + h->num_deleted >= h->upper_bound) {
         uint32_t new_num_buckets = (h->size >= h->grow_threshold) ? (h->num_buckets << 1) : h->num_buckets;
         _mdict_resize_rehash(h, new_num_buckets);
@@ -360,7 +364,7 @@ static inline bool mdict_set(h_t *h, const_k_t key, v_t val, v_t* val_box, bool 
     return true;
 }
 
-static inline bool mdict_remove(h_t *h, const_k_t key, v_t* val_box) {
+static inline bool mdict_remove(h_t *h, k_t key, v_t* val_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
@@ -377,7 +381,7 @@ static inline bool mdict_remove(h_t *h, const_k_t key, v_t* val_box) {
     return true;
 }
 
-static inline bool mdict_get(h_t *h, const_k_t key, v_t* val_box) {
+static inline bool mdict_get(h_t *h, k_t key, v_t* val_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
@@ -388,7 +392,7 @@ static inline bool mdict_get(h_t *h, const_k_t key, v_t* val_box) {
     return true;
 }
 
-static inline bool mdict_contains(h_t *h, const_k_t key) {
+static inline bool mdict_contains(h_t *h, k_t key) {
     uint32_t hash = _hash_func(key);
     return _mdict_read_index(h, key, hash >> 7, hash & 0x7f) >= 0;
 }

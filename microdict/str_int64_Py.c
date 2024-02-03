@@ -86,7 +86,7 @@ static PyObject* key_iternext(iterObj* self) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = _get_key(h->keys, i);
             self->iter_idx = i+1;
-            return PyUnicode_DecodeUTF8(key, strlen(key), NULL);
+            return PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -136,7 +136,7 @@ static PyObject* item_iternext(iterObj* self) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = _get_key(h->keys, i);
             self->iter_idx = i+1;
-            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key, strlen(key), NULL), PyLong_FromLongLong(h->vals[i]));
+            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyLong_FromLongLong(h->vals[i]));
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -219,11 +219,14 @@ static PyObject* get(dictObj* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "O|O", &key_obj, &default_obj)) {
         return NULL;
     }
-    const char* key = PyUnicode_AsUTF8(key_obj);
-    if (key == NULL) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
+    key.len = len;
 
     v_t val;
     if (!mdict_get(self->ht, key, &val)) {
@@ -248,19 +251,22 @@ static PyObject* pop(dictObj* self, PyObject* args) {
         return NULL;
     }
 
-    const char* k = PyUnicode_AsUTF8(key_obj);
-    if (k == NULL) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
+    key.len = len;
 
     v_t v;
-    if (!mdict_remove(self->ht, k, &v)) {
+    if (!mdict_remove(self->ht, key, &v)) {
         if (default_obj != NULL) {
             Py_INCREF(default_obj);
             return default_obj;
         }
-        PyErr_SetString(PyExc_KeyError, k);
+        PyErr_SetString(PyExc_KeyError, key.ptr);
         return NULL;
     }
     return PyLong_FromLongLong(v);
@@ -277,14 +283,17 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
         return NULL;
     }
 
-    const char* k = PyUnicode_AsUTF8(key_obj);
-    if (k == NULL) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
+    key.len = len;
  
     // can use &dfault as val_box because the default doesn't need to be read
-    mdict_set(self->ht, k, dfault, &dfault, false);
+    mdict_set(self->ht, key, dfault, &dfault, false);
     if (self->ht->error_code) {
         PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
         return NULL;
@@ -322,11 +331,12 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
             return -1;
         }
 
-        const char* key = PyUnicode_AsUTF8(key_obj);
-        if (key == NULL) {
+        key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+        if (key.ptr == NULL) {
             PyErr_SetString(PyExc_TypeError, "Key must be a string");
-            return -1;
+            return NULL;
         }
+        key.len = len;
 
         mdict_set(self->ht, key, val, NULL, true);
         if (self->ht->error_code) {
@@ -361,11 +371,14 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
  * This function is called for the python expression 'k in dict'. k must be of the same type as the hashtable keys.
  */
 static int _contains_(dictObj* self, PyObject* key_obj) {
-    const char* key = PyUnicode_AsUTF8(key_obj);
-    if (key == NULL) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return -1;
     }
+    key.len = len;
 
     return mdict_contains(self->ht, key);
 }
@@ -382,15 +395,18 @@ static int _len_(dictObj* self) {
  * This function is invoked when dict[k] is called.
  */
 static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
-    const char* key = PyUnicode_AsUTF8(key_obj);
-    if (key == NULL) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
+    key.len = len;
 
     v_t val;
     if (!mdict_get(self->ht, key, &val)) {
-        PyErr_SetString(PyExc_KeyError, key);
+        PyErr_SetString(PyExc_KeyError, key.ptr);
         return NULL;
     }
     return PyLong_FromLongLong(val);
@@ -401,14 +417,17 @@ static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
  * This is also invoke for del d[key], in which case the `val_obj` is NULL
  */
 static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
+    k_t key;
+    Py_ssize_t len;
+    key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
+    if (key.ptr == NULL) {
+        PyErr_SetString(PyExc_TypeError, "Key must be a string");
+        return NULL;
+    }
+    key.len = len;
     if (val_obj == NULL) {
-        const char* k = PyUnicode_AsUTF8(key_obj);
-        if (k == NULL) {
-            return -1;
-        }
-
-        if (!mdict_remove(self->ht, k, NULL)) {
-            PyErr_SetString(PyExc_KeyError, k);
+        if (!mdict_remove(self->ht, key, NULL)) {
+            PyErr_SetString(PyExc_KeyError, key.ptr);
             return NULL;
         }
         return 0;
@@ -420,8 +439,6 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
         return -1;
     }
 
-    const char* key = PyUnicode_AsUTF8(key_obj);
-    
     mdict_set(self->ht, key, val, NULL, true);
     if (self->ht->error_code) {
         PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
@@ -449,7 +466,7 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
     for (uint32_t i = 0; is_equal && i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = _get_key(h->keys, i);
-            PyObject* other_val_obj = PyMapping_GetItemString(other, key);
+            PyObject* other_val_obj = PyMapping_GetItemString(other, key.ptr);
             if (other_val_obj == NULL) {
                 is_equal = false;
                 break;
@@ -457,6 +474,7 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
             v_t other_val = PyLong_AsLongLong(other_val_obj);
             if (other_val == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
+                is_equal = false;
                 break;
             }
             is_equal = (h->vals[i] == other_val);
