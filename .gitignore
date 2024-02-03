@@ -5,7 +5,9 @@ misc/
 __pycache__/
 dist/
 microdict.egg-info/
-
+microdict/tests/.clarcache
+microdict/tests/clar.suite
+microdict/tests/suite
 
 # Prerequisites
 *.d
@@ -59,3 +61,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# LSP, editor
+.cache
+.vscode
+compile_commands.json
