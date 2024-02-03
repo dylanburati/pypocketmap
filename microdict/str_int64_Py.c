@@ -84,7 +84,7 @@ static PyObject* key_iternext(iterObj* self) {
     h_t* h = self->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = h->keys[i];
+            k_t key = _get_key(h->keys, i);
             self->iter_idx = i+1;
             return PyUnicode_DecodeUTF8(key, strlen(key), NULL);
         }
@@ -134,7 +134,7 @@ static PyObject* item_iternext(iterObj* self) {
     h_t* h = self->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = h->keys[i];
+            k_t key = _get_key(h->keys, i);
             self->iter_idx = i+1;
             return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key, strlen(key), NULL), PyLong_FromLongLong(h->vals[i]));
         }
@@ -347,7 +347,7 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
 
     for (uint32_t i = 0; i < other->num_buckets; i++) {
         if (_bucket_is_live(other->flags, i)) {
-            mdict_set(h, other->keys[i], other->vals[i], NULL, true);
+            mdict_set(h, _get_key(other->keys, i), other->vals[i], NULL, true);
             if (self->ht->error_code) {
                 PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
                 return -1;
@@ -448,7 +448,7 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
     h_t* h = self->ht;
     for (uint32_t i = 0; is_equal && i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = h->keys[i];
+            k_t key = _get_key(h->keys, i);
             PyObject* other_val_obj = PyMapping_GetItemString(other, key);
             if (other_val_obj == NULL) {
                 is_equal = false;

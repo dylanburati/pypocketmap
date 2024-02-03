@@ -15,73 +15,108 @@
 
 #if KEY_TYPE_TAG == TYPE_TAG_I32
 typedef int32_t k_t;
+typedef int32_t pk_t;
 typedef int32_t const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-#define KEY_FREE(a) a
 static inline uint32_t _hash_func(const_k_t key) { return (uint32_t) key; }
-static inline bool _set_key(k_t* keys, uint32_t idx, const_k_t k) {
+static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
+static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
     keys[idx] = k;
     return true;
 }
+static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t k_t;
+typedef int64_t pk_t;
 typedef int64_t const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-#define KEY_FREE(a) a
 static inline uint32_t _hash_func(const_k_t key) { return ((uint32_t) key) ^ ((uint32_t) (key >> 32)); }
-static inline bool _set_key(k_t* keys, uint32_t idx, const_k_t k) {
+static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
+static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
     keys[idx] = k;
     return true;
 }
+static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;
+typedef float pk_t;
 typedef float const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-#define KEY_FREE(a) a
 static inline uint32_t _hash_func(const_k_t key) {
     uint32_t ikey = *((uint32_t*) &key);
     return ikey ^ (ikey >> 16);
 }
-static inline bool _set_key(k_t* keys, uint32_t idx, const_k_t k) {
+static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
+static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
     keys[idx] = k;
     return true;
 }
+static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F64
 typedef double k_t;
+typedef double pk_t;
 typedef double const_k_t;
 #define KEY_EQ(a, b) ((a) == (b))
-#define KEY_FREE(a) a
 static inline uint32_t _hash_func(const_k_t key) {
     uint64_t ikey64 = *((uint64_t*) &key);
     uint32_t ikey = ((uint32_t) ikey) ^ ((uint32_t) (ikey >> 32))
     return ikey ^ (ikey >> 16);
 }
-static inline bool _set_key(k_t* keys, uint32_t idx, const_k_t k) {
+static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
+static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
     keys[idx] = k;
     return true;
 }
-
+static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_STR
 typedef char* k_t;
+typedef union {
+    struct {
+        char data[15];
+        uint8_t meta;
+    } contained;
+    struct {
+        char* ptr;
+#if UINTPTR_MAX == 0xffffffff
+        uint32_t __pad;
+#endif
+        uint64_t __zero;
+    } spilled;
+} pk_t;
 typedef const char* const_k_t;
 #define KEY_EQ(a, b) (strcmp((a), (b)) == 0)
-#define KEY_FREE(a) free(a)
 #include "./wyhash.h"
 const uint64_t transparent_xor[5] = {0, 0, 0, 0, 0};
 static inline uint32_t _hash_func(const_k_t key) {
     return (uint32_t) (wyhash((void*) key, strlen(key), 1, transparent_xor));
 }
-static inline bool _set_key(k_t* keys, uint32_t idx, const_k_t k) {
+static inline k_t _get_key(pk_t* keys, uint32_t idx) {
+    if (keys[idx].contained.meta) {
+        return keys[idx].contained.data;
+    }
+    return keys[idx].spilled.ptr;
+}
+static inline bool _set_key(pk_t* keys, uint32_t idx, const_k_t k) {
     size_t len = strlen(k);
-    k_t k_copy = (k_t)malloc(len + 1);
-    if (k_copy == NULL) return false;
-    memcpy(k_copy, k, len + 1);
-    keys[idx] = k_copy;
+    if (len < 15) {
+        memcpy(keys[idx].contained.data, k, len+1);
+        keys[idx].contained.meta = 1;
+    } else {
+        keys[idx].spilled.ptr = (char*) malloc(len+1);
+        if (keys[idx].spilled.ptr == NULL) return false;
+        memcpy(keys[idx].spilled.ptr, k, len+1);
+        keys[idx].spilled.__zero = 0;
+    }
     return true;
+}
+static inline void _unset_key(pk_t* keys, uint32_t idx) {
+    if (!keys[idx].contained.meta) {
+        free(keys[idx].spilled.ptr);
+    }
 }
 #endif
 
@@ -107,7 +142,7 @@ typedef struct {
     uint32_t grow_threshold;  // size below this threshold when hitting upper_bound means rehash at eq num_buckets
     uint32_t seed;
     uint64_t *flags;  // each 8 bits refers to a bucket; see simd constants
-    k_t *keys;
+    pk_t *keys;
     v_t *vals;
     int error_code;
     bool is_map;
@@ -181,7 +216,7 @@ static inline int32_t _mdict_read_index(h_t *h, const_k_t key, uint32_t hash_upp
         while (_gbits_has_next(matches)) {
             uint32_t offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (KEY_EQ(h->keys[index], key)) {  // likely
+            if (KEY_EQ(_get_key(h->keys, index), key)) {  // likely
                 return index;
             }
         }
@@ -208,7 +243,7 @@ static int _mdict_resize(h_t *h, uint32_t new_num_buckets) {
     memset(new_flags, FLAGS_EMPTY, _flags_size(new_num_buckets) * sizeof(uint64_t));
 
     // TODO can probably realloc when growing
-    k_t *new_keys = (k_t*)calloc(new_num_buckets, sizeof(k_t));
+    pk_t *new_keys = (pk_t*)calloc(new_num_buckets, sizeof(pk_t));
     if (!new_keys) {
         free(new_flags);
         return -1;
@@ -235,7 +270,7 @@ static int _mdict_resize(h_t *h, uint32_t new_num_buckets) {
 
 static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
     uint32_t old_num_buckets = h->num_buckets;
-    k_t* old_keys = h->keys;
+    pk_t* old_keys = h->keys;
     v_t* old_vals = h->vals;
     uint64_t* old_flags = h->flags;
 
@@ -251,12 +286,12 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
     
     for (uint32_t j = 0; j < old_num_buckets; ++j) {
         if (_bucket_is_live(old_flags, j)) {
-            k_t key = old_keys[j];
+            pk_t key = old_keys[j];
             v_t val;
             if (h->is_map) {
                 val = old_vals[j];
             }
-            uint32_t hash = _hash_func(key);
+            uint32_t hash = _hash_func(_get_key(old_keys, j));
             uint32_t flags_index = (hash >> 7) & new_mask;
             uint32_t h2 = hash & 0x7f;
             uint32_t step = step_basis;
@@ -333,7 +368,7 @@ static inline bool mdict_remove(h_t *h, const_k_t key, v_t* val_box) {
     }
 
     _bucket_set(h->flags, idx, FLAGS_DELETED);
-    KEY_FREE(h->keys[idx]);
+    _unset_key(h->keys, idx);
     if (val_box != NULL) {
         *val_box = h->vals[idx];
     }

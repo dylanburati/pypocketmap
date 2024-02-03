@@ -1,5 +1,5 @@
 ctest:
 	cd microdict/tests && \
 	python ./generate.py . && \
-	gcc -I. -o suite *.c && \
+	gcc $(EXTRA_GCC_FLAGS) -I. -o suite *.c && \
 	./suite
