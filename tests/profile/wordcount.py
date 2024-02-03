@@ -14,12 +14,13 @@ if __name__ == "__main__":
     print(m)
     rng = np.random.default_rng(0)
 
+    scale = 2 / 0.7
     lanes = (
-        ((rng.poisson(8, (100, 100)) | 64) << 24)
-        | ((rng.poisson(8, (100, 100)) | 64) << 16)
-        | ((rng.poisson(8, (100, 100)) | 64) << 8)
-        | (rng.poisson(8, (100, 100)) | 64)
-    ).astype(np.uint32)
+        ((rng.exponential(scale, (100, 100)).astype(np.uint32) | 64) << 24)
+        | ((rng.exponential(scale, (100, 100)).astype(np.uint32) | 64) << 16)
+        | ((rng.exponential(scale, (100, 100)).astype(np.uint32) | 64) << 8)
+        | (rng.exponential(scale, (100, 100)).astype(np.uint32) | 64)
+    )
     i = 0
     while i < iterations:
         b = lanes.tobytes()
@@ -32,5 +33,7 @@ if __name__ == "__main__":
             w = b[lx[j]:en].decode("ascii")
             m[w] = m.get(w, 0) + 1
             i += 1
-        rng.shuffle(lanes)
+        vl = lanes.view()
+        vl.shape = (10000,)
+        rng.shuffle(vl)
     print("Size:", len(m))
