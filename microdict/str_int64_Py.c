@@ -5,10 +5,10 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#include "./flags.h"
+#include "flags.h"
 #define KEY_TYPE_TAG TYPE_TAG_STR
 #define VAL_TYPE_TAG TYPE_TAG_I64
-#include "./abstract.h"
+#include "abstract.h"
 
 typedef struct {
     PyObject_HEAD
@@ -219,7 +219,7 @@ static PyObject* get(dictObj* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "O|O", &key_obj, &default_obj)) {
         return NULL;
     }
-    char* key = PyUnicode_AsUTF8(key_obj);
+    const char* key = PyUnicode_AsUTF8(key_obj);
     if (key == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
@@ -248,8 +248,9 @@ static PyObject* pop(dictObj* self, PyObject* args) {
         return NULL;
     }
 
-    k_t k = PyUnicode_AsUTF8(key_obj);
+    const char* k = PyUnicode_AsUTF8(key_obj);
     if (k == NULL) {
+        PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
 
@@ -276,24 +277,15 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
         return NULL;
     }
 
-    k_t k = PyUnicode_AsUTF8(key_obj);
+    const char* k = PyUnicode_AsUTF8(key_obj);
     if (k == NULL) {
-        return NULL;
-    }
- 
-    Py_ssize_t len;
-    const char* key_py = PyUnicode_AsUTF8AndSize(key_obj, &len);
-    if (key_py == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
-    char* key = malloc(len+1);
-    memcpy(key, key_py, len+1);
-
+ 
     // can use &dfault as val_box because the default doesn't need to be read
-    mdict_set(self->ht, key, dfault, &dfault, false);
+    mdict_set(self->ht, k, dfault, &dfault, false);
     if (self->ht->error_code) {
-        free(key);
         PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
         return NULL;
     }
@@ -330,17 +322,14 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
             return -1;
         }
 
-        const char* key_py = PyUnicode_AsUTF8AndSize(key_obj, &len);
-        if (key_py == NULL) {
+        const char* key = PyUnicode_AsUTF8(key_obj);
+        if (key == NULL) {
             PyErr_SetString(PyExc_TypeError, "Key must be a string");
             return -1;
         }
-        char* key = malloc(len+1);
-        memcpy(key, key_py, len+1);
 
         mdict_set(self->ht, key, val, NULL, true);
         if (self->ht->error_code) {
-            free(key);
             PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
             return -1;
         }
@@ -358,13 +347,8 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
 
     for (uint32_t i = 0; i < other->num_buckets; i++) {
         if (_bucket_is_live(other->flags, i)) {
-            uint64_t len = strlen(other->keys[i]);
-            char* key = malloc( len + 1);
-            memcpy(key, other->keys[i], len+1);
-            
             mdict_set(h, other->keys[i], other->vals[i], NULL, true);
             if (self->ht->error_code) {
-                free(key);
                 PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
                 return -1;
             }
@@ -377,7 +361,7 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
  * This function is called for the python expression 'k in dict'. k must be of the same type as the hashtable keys.
  */
 static int _contains_(dictObj* self, PyObject* key_obj) {
-    char* key = PyUnicode_AsUTF8(key_obj);
+    const char* key = PyUnicode_AsUTF8(key_obj);
     if (key == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return -1;
@@ -398,7 +382,7 @@ static int _len_(dictObj* self) {
  * This function is invoked when dict[k] is called.
  */
 static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
-    char* key = PyUnicode_AsUTF8(key_obj);
+    const char* key = PyUnicode_AsUTF8(key_obj);
     if (key == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
@@ -436,15 +420,7 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
         return -1;
     }
 
-    Py_ssize_t len;
-    const char* key_py = PyUnicode_AsUTF8AndSize(key_obj, &len);
-    if (key_py == NULL) {
-        PyErr_SetString(PyExc_TypeError, "Key must be a string");
-        return -1;
-    }
-    char* key = malloc(len+1);
-    memcpy(key, key_py, len+1);
-
+    const char* key = PyUnicode_AsUTF8(key_obj);
     
     mdict_set(self->ht, key, val, NULL, true);
     if (self->ht->error_code) {

@@ -1,3 +1,5 @@
+import os
+import sys
 from setuptools import setup, Extension, find_packages
 
 parent_dir = "microdict"
@@ -35,7 +37,18 @@ setup(
     license="MIT",
     url="https://github.com/touqir14/Microdict",
     ext_package="_mdict_c",
-    package_data={"microdict": ""},
+    package_data={
+        "microdict": [
+            "__init__.py",
+            "__init__.pyi",
+            "abstract.h",
+            "bits.h",
+            "flags.h",
+            "simd.h",
+            "wyhash.h",
+        ],
+        "microdict._mdict_c": ["__init__.py", "str_int64.pyi"],
+    },
     ext_modules=[module_str_int64],
     packages=find_packages(),
     classifiers=[

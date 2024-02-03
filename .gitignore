@@ -8,6 +8,7 @@ microdict.egg-info/
 microdict/tests/.clarcache
 microdict/tests/clar.suite
 microdict/tests/suite
+.profiles/
 
 # Prerequisites
 *.d
@@ -62,7 +63,9 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# LSP, editor
+# LSP, editor, env
 .cache
 .vscode
+/.venv/
+/.tox/
 compile_commands.json

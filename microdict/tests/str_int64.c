@@ -9,13 +9,16 @@
 
 static h_t* m;
 static char* k_search;
+static char* k_ins;
 
 void test_str_int64__initialize(void) {
   m = mdict_create(32, true);
   k_search = malloc(4);
+  k_ins = malloc(4);
 }
 
 void test_str_int64__cleanup(void) {
+  free(k_ins);
   free(k_search);
   mdict_destroy(m);
 }
@@ -27,9 +30,8 @@ void test_str_int64__lots_of_insertions(void) {
 
     int count = 201;
     for (int i = 1; i < count; i++) {
-      char *k = malloc(4);
-      sprintf(k, "%d", i);
-      cl_assert(mdict_set(m, k, (int64_t) i, NULL, true));
+      sprintf(k_ins, "%d", i);
+      cl_assert(mdict_set(m, k_ins, (int64_t) i, NULL, true));
       
       for (int j = 1; j <= i; j++) {
         sprintf(k_search, "%d", j);
@@ -70,9 +72,8 @@ void test_str_int64__lots_of_insertions(void) {
     }
 
     for (int i = 1; i < count; i++) {
-      char *k = malloc(4);
-      sprintf(k, "%d", i);
-      cl_assert(mdict_set(m, k, (int64_t) i, NULL, true));
+      sprintf(k_ins, "%d", i);
+      cl_assert(mdict_set(m, k_ins, (int64_t) i, NULL, true));
     }
 
     // remove backwards
