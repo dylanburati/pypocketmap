@@ -1,6 +1,7 @@
 #include "clar.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "../flags.h"
 #define KEY_TYPE_TAG TYPE_TAG_STR
@@ -89,4 +90,32 @@ void test_str_int64__lots_of_insertions(void) {
       }
     }
   }
+}
+
+void test_str_int64__long_keys(void) {
+  cl_assert_equal_i(m->size, 0);
+  char* buf = (char*) malloc(65536);
+  for (int i = 8; i < 65536; i += 8) {
+    strcpy(&buf[i-8], "WXYZ\x00\x01\x02\x03");
+    k_t k = {buf, i};
+    cl_assert(mdict_set(m, k, (int64_t) i, NULL, true));
+  }
+  cl_assert_equal_i(m->size, 8191);
+  v_t v;
+  for (int i = 8; i < 65536; i += 8) {
+    k_t k = {buf, i};
+    cl_assert(mdict_get(m, k, &v));
+    for (int j = i-7; j < i; j++) {
+      k.len = j;
+      cl_assert(!mdict_get(m, k, &v));
+    }
+    cl_assert_equal_i(v, i);
+  }
+  cl_assert_equal_i(m->size, 8191);
+  for (int i = 8; i < 65536; i += 8) {
+    k_t k = {buf, i};
+    cl_assert(mdict_remove(m, k, &v));
+    cl_assert_equal_i(v, i);
+  }
+  cl_assert_equal_i(m->size, 0);
 }

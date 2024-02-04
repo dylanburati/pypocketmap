@@ -53,6 +53,7 @@ microdict/tests/suite
 *.su
 *.idb
 *.pdb
+perf.data*
 
 # Kernel Module Compile Results
 *.mod*
