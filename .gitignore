@@ -4,10 +4,10 @@ build/
 misc/
 __pycache__/
 dist/
-microdict.egg-info/
-microdict/tests/.clarcache
-microdict/tests/clar.suite
-microdict/tests/suite
+pypocketmap.egg-info/
+pypocketmap/tests/.clarcache
+pypocketmap/tests/clar.suite
+pypocketmap/tests/suite
 .profiles/
 
 # Prerequisites

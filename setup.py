@@ -2,7 +2,7 @@ import os
 import sys
 from setuptools import setup, Extension, find_packages
 
-parent_dir = "microdict"
+parent_dir = "pypocketmap"
 
 
 if os.name != "nt":
@@ -28,17 +28,17 @@ with open("README.md") as fh:
     long_description = fh.read()
 
 setup(
-    name="microdict",
-    version="0.1.1",
+    name="pypocketmap",
+    version="0.0.0-alpha",
     author="Dylan Burati, Touqir Sajed",
-    description="The Microdict library - a high performance Python hashtable implementation",
+    description="pypocketmap - a memory-efficient hashtable for CPython",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license="MIT",
-    url="https://github.com/touqir14/Microdict",
-    ext_package="_mdict_c",
+    license="MIT, Apache 2.0",
+    url="https://github.com/dylanburati/pypocketmap",
+    ext_package="_pkt_c",
     package_data={
-        "microdict": [
+        "pypocketmap": [
             "__init__.py",
             "__init__.pyi",
             "abstract.h",
@@ -47,12 +47,12 @@ setup(
             "simd.h",
             "wyhash.h",
         ],
-        "microdict._mdict_c": ["__init__.py", "str_int64.pyi"],
+        "pypocketmap._pkt_c": ["__init__.py", "str_int64.pyi"],
     },
     ext_modules=[module_str_int64],
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Operating System :: MacOS",

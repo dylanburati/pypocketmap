@@ -34,7 +34,7 @@ static PyObject* item_iternext(iterObj* self);
 
 static PyTypeObject keyIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "microdict_keys[str, int64]",
+    .tp_name = "pypocketmap_keys[str, int64]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -46,7 +46,7 @@ static PyTypeObject keyIterType_str_int64 = {
 
 static PyTypeObject valueIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "microdict_values[str, int64]",
+    .tp_name = "pypocketmap_values[str, int64]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -58,7 +58,7 @@ static PyTypeObject valueIterType_str_int64 = {
 
 static PyTypeObject itemIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "microdict_items[str, int64]",
+    .tp_name = "pypocketmap_items[str, int64]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -510,7 +510,7 @@ static PyObject* items(dictObj* self) {
 }
 
 /**
- * Returns a new microdictionary object containing all items present in this hashtable when dict.copy() is called.
+ * Returns a new pypocketmap containing all items present in this hashtable when dict.copy() is called.
  */
 static PyObject* copy(dictObj* self) {
     PyObject* args = Py_BuildValue("I", self->ht->num_buckets);
@@ -527,10 +527,10 @@ static PyMethodDef methods_str_str[] = {
     {"pop", (PyCFunction)pop, METH_VARARGS, "If key is in the dictionary, remove it and return its value, else return `default`. If `default` is not given and `key` is not in the dictionary, a KeyError is raised."},
     {"setdefault", (PyCFunction)setdefault, METH_VARARGS, "If `key` is in the dictionary, return its value. If not, insert `key` with a value of `default` and return `default`. default defaults to 0."},
     {"clear", (PyCFunction)clear, METH_VARARGS, "Remove all items from the dictionary."},
-    {"update", (PyCFunction)update, METH_VARARGS, "Updates the microdict with all key-value pairs within the given input: Either a Python dictionary or another microdict"},
-    {"keys", (PyCFunction)keys, METH_VARARGS, "Returns an iterator for iterating over keys"},
-    {"values", (PyCFunction)values, METH_VARARGS, "Returns an iterator for iterating over values"},
-    {"items", (PyCFunction)items, METH_VARARGS, "Returns an iterator for iterating over items"},
+    {"update", (PyCFunction)update, METH_VARARGS, "Updates the map with all key-value pairs within the given input."},
+    {"keys", (PyCFunction)keys, METH_VARARGS, "Returns an iterator over the map's keys"},
+    {"values", (PyCFunction)values, METH_VARARGS, "Returns an iterator over the map's values"},
+    {"items", (PyCFunction)items, METH_VARARGS, "Returns an iterator over the map's (key, value) pairs"},
     {"copy", (PyCFunction)copy, METH_VARARGS, "Returns a deep copy of the hashtable"},
     {NULL, NULL, 0, NULL}
 };
@@ -554,8 +554,8 @@ static PyMappingMethods mapping_str_int64 = {
 
 static PyTypeObject dictType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "microdict[str, int64]",
-    .tp_doc = "microdict[str, int64]", 
+    .tp_name = "pypocketmap[str, int64]",
+    .tp_doc = "pypocketmap[str, int64]", 
     .tp_basicsize = sizeof(dictObj),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
@@ -571,8 +571,8 @@ static PyTypeObject dictType_str_int64 = {
 };
 
 /**
- * Invoked when dict.update() is called. It takes an argument which must be either a Python dictionary or a microdictionary
- * of the same type. It adds all the items from the argument dictionary given to its hashtable. See _update_from_Pydict and
+ * Invoked when dict.update() is called. It takes an argument which must be either a Python dictionary or a
+ * pypocketmap of the same type. It adds all the items from the argument dictionary given to its hashtable. See _update_from_Pydict and
  * _update_from_mdict for further documentation.
  *
  * TODO try to get this working for generic mappings
@@ -588,7 +588,7 @@ static PyObject* update(dictObj* self, PyObject* args) {
         }
 
         if (PyObject_IsInstance(other, (PyObject *) &dictType_str_int64) != 1) {
-            PyErr_SetString(PyExc_TypeError, "Argument needs to be either a (key,value) string microdictionary or (key, value) string Python dictionary");
+            PyErr_SetString(PyExc_TypeError, "Argument needs to be either a pypocketmap[str, int64] or compatible Python dictionary");
             return NULL;
         }
     }
@@ -610,7 +610,7 @@ static PyObject* update(dictObj* self, PyObject* args) {
 static struct PyModuleDef moduleDef_str_int64 = {
     PyModuleDef_HEAD_INIT,
     "str_int64", /* name of module */
-    "microdict[str, int64]", // Documentation of the module
+    "pypocketmap[str, int64]", // Documentation of the module
     -1,   /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
 };
 

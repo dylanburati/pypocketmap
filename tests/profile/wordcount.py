@@ -9,8 +9,8 @@ if __name__ == "__main__":
     if implementation == "dict":
         m = {}
     else:
-        from microdict import mdict, dtype
-        m = mdict(dtype.string, dtype.int64)
+        import pypocketmap
+        m = pypocketmap.create(str, int)
     print(m)
     rng = np.random.default_rng(0)
 
