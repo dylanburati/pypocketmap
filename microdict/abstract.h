@@ -89,6 +89,7 @@ typedef union {
     pk_spilled spilled;
 } pk_t;
 #define KEY_EQ(a, b) ((a.len == b.len) && memcmp(a.ptr, b.ptr, a.len) == 0)
+#define KEYS_POINT 1
 #include "./wyhash.h"
 const uint64_t transparent_xor[5] = {0, 0, 0, 0, 0};
 static inline uint32_t _hash_func(k_t key) {
@@ -171,9 +172,9 @@ static inline uint32_t _match_index(uint32_t flags_index, uint32_t offset) {
     return (flags_index << 3) + offset;
 }
 
-static int _mdict_resize(h_t *h, uint32_t new_num_buckets);
+static int _mdict_resize(h_t* h, uint32_t new_num_buckets);
 
-static h_t *mdict_create(uint32_t num_buckets, bool is_map) {
+static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
     h_t* h = (h_t*)calloc(1, sizeof(h_t));
 
     h->size = 0;
@@ -195,8 +196,19 @@ static h_t *mdict_create(uint32_t num_buckets, bool is_map) {
     return h;
 }
 
-static void mdict_destroy(h_t *h) {
+static void _mdict_clear_keys(h_t* h) {
+    for (uint32_t j = 0; j < h->num_buckets; ++j) {
+        if (_bucket_is_live(h->flags, j)) {
+            _unset_key(h->keys, j);
+        }
+    }
+}
+
+static void mdict_destroy(h_t* h) {
     if (h) {
+#ifdef KEYS_POINT
+        _mdict_clear_keys(h);
+#endif
         free((void *)h->keys);
         free(h->flags);
         free((void *)h->vals);
@@ -204,7 +216,7 @@ static void mdict_destroy(h_t *h) {
     }
 }
 
-static inline int32_t _mdict_read_index(h_t *h, k_t key, uint32_t hash_upper, uint32_t h2) {
+static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, uint32_t h2) {
     const uint32_t step_basis = GROUP_WIDTH >> 3;
     uint32_t mask = _flags_size(h->num_buckets) - 1;
     mask &= ~(step_basis - 1);  // e.g. mask should select 0,2,4,6 if 64 buckets, flags_size 8, num_groups 4
@@ -238,7 +250,7 @@ static inline int32_t _mdict_read_index(h_t *h, k_t key, uint32_t hash_upper, ui
 }
 
 // Caller is responsible for rehashing and freeing previous keys,values,flags
-static int _mdict_resize(h_t *h, uint32_t new_num_buckets) {
+static int _mdict_resize(h_t* h, uint32_t new_num_buckets) {
     uint64_t* new_flags = (uint64_t*) calloc(_flags_size(new_num_buckets), sizeof(uint64_t));
 
     if (!new_flags)
@@ -326,13 +338,13 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
     free(old_vals);
 }
 
-static void mdict_clear(h_t *h) {
+static void mdict_clear(h_t* h) {
     memset(h->flags, FLAGS_EMPTY, _flags_size(h->num_buckets) * sizeof(uint64_t));
     h->size = 0;
     h->num_deleted = 0;
 }
 
-static inline bool mdict_set(h_t *h, k_t key, v_t val, v_t* val_box, bool should_replace) {
+static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should_replace) {
     if (h->size + h->num_deleted >= h->upper_bound) {
         uint32_t new_num_buckets = (h->size >= h->grow_threshold) ? (h->num_buckets << 1) : h->num_buckets;
         _mdict_resize_rehash(h, new_num_buckets);
@@ -392,7 +404,7 @@ static inline bool mdict_set(h_t *h, k_t key, v_t val, v_t* val_box, bool should
     return true;
 }
 
-static inline bool mdict_remove(h_t *h, k_t key, v_t* val_box) {
+static inline bool mdict_remove(h_t* h, k_t key, v_t* val_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
@@ -409,7 +421,7 @@ static inline bool mdict_remove(h_t *h, k_t key, v_t* val_box) {
     return true;
 }
 
-static inline bool mdict_get(h_t *h, k_t key, v_t* val_box) {
+static inline bool mdict_get(h_t* h, k_t key, v_t* val_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
@@ -420,7 +432,7 @@ static inline bool mdict_get(h_t *h, k_t key, v_t* val_box) {
     return true;
 }
 
-static inline bool mdict_contains(h_t *h, k_t key) {
+static inline bool mdict_contains(h_t* h, k_t key) {
     uint32_t hash = _hash_func(key);
     return _mdict_read_index(h, key, hash >> 7, hash & 0x7f) >= 0;
 }

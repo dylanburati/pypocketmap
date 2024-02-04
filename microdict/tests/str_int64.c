@@ -24,6 +24,11 @@ void test_str_int64__initialize(void) {
 }
 
 void test_str_int64__cleanup(void) {
+  // insert some keys to test destroy for leaks
+  k_t k = {"contained", 9};
+  mdict_set(m, k, 0, NULL, true);
+  k_t k2 = {"spil LLLL LLLL led!.", 20};
+  mdict_set(m, k2, 0, NULL, true);
   free((void*) test_key.ptr);
   mdict_destroy(m);
 }
@@ -118,4 +123,5 @@ void test_str_int64__long_keys(void) {
     cl_assert_equal_i(v, i);
   }
   cl_assert_equal_i(m->size, 0);
+  free(buf);
 }
