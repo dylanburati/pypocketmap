@@ -452,13 +452,14 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
  */
 static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
     if (op != Py_EQ && op != Py_NE) {
+        Py_INCREF(Py_NotImplemented);
         return Py_NotImplemented;
     }
     if (!PyMapping_Check(other)) {
-        return (op == Py_EQ) ? Py_False : Py_True;
+        return PyBool_FromLong(op != Py_EQ);
     }
     if (PyMapping_Size(other) != self->ht->size) {
-        return (op == Py_EQ) ? Py_False : Py_True;
+        return PyBool_FromLong(op != Py_EQ);
     }
 
     bool is_equal = true;
@@ -480,7 +481,7 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
             is_equal = (h->vals[i] == other_val);
         }
     }
-    return ((op == Py_EQ) == is_equal) ? Py_True : Py_False;
+    return PyBool_FromLong((op == Py_EQ) == is_equal);
 }
 
 /**
