@@ -361,6 +361,16 @@ static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
       _mm_movemask_epi8(_mm_cmpgt_epi8_fixed(special, ctrl)) + 1));
 }
 
+// sets the octet at `ctrl` bits [offset*8..offset*8+8] to the given hash
+static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t hash) {
+  // only works because ctrl:kEmpty = -128
+  int64_t high = -((int64_t)offset >> 3);
+  uint64_t mask = ((uint64_t)hash | 0x80ULL) << ((offset&7) << 3);
+  g_t ghash = _mm_set_epi64x(mask & (uint64_t)high, mask & ~((uint64_t) high));
+  g_t res = _mm_xor_si128(ctrl, ghash);
+  _mm_storeu_si128((g_t*) dst, res);
+}
+
 static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {
   g_t msbs = _mm_set1_epi8((char) (-128));
   g_t x126 = _mm_set1_epi8((char) 126);
@@ -445,6 +455,16 @@ static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
   return count_trailing_zeroes64(mask);
 }
 
+static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t hash) {
+  uint64_t curr = vget_lane_u64(vreinterpret_u64_u8(ctrl), 0);
+  uint64_t mask = (((uint64_t)hash) | 0x80ULL) << (offset<<3);
+  uint64_t res = curr ^ mask;
+#ifdef ABSL_IS_BIG_ENDIAN
+  res = gbswap_64(res);
+#endif
+  memcpy(dst, &res, sizeof res);
+}
+
 static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {
   uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(ctrl), 0);
   const uint64_t slsbs = 0x0202020202020202ULL;
@@ -523,6 +543,15 @@ static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
   // kDeleted. We lower all other bits and count number of trailing zeros.
   const uint64_t bits = 0x0101010101010101ULL;
   return count_trailing_zeroes64((ctrl | ~(ctrl >> 7)) & bits) >> 3;
+}
+
+static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t hash) {
+  uint64_t mask = (((uint64_t)hash) | 0x80ULL) << (offset<<3);
+  uint64_t res = ctrl ^ mask;
+#ifdef ABSL_IS_BIG_ENDIAN
+  res = gbswap_64(res);
+#endif
+  memcpy(dst, &res, sizeof res);
 }
 
 static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {

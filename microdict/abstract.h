@@ -381,8 +381,8 @@ static inline bool mdict_set(h_t *h, k_t key, v_t val, v_t* val_box, bool should
         step += step_basis;
     }
     
+    _group_set(group, (int8_t*) &h->flags[flags_index], offset, h2);
     uint32_t idx = _match_index(flags_index, offset);
-    _bucket_set(h->flags, idx, hash & 0x7f);
     if (!_set_key(h->keys, idx, key)) {
         h->error_code = -2;
         return false;
