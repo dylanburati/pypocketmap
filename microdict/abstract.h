@@ -342,18 +342,46 @@ static inline bool mdict_set(h_t *h, k_t key, v_t val, v_t* val_box, bool should
     }
 
     uint32_t hash = _hash_func(key);
-    int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
-    if (idx >= 0) {
-        if (val_box != NULL) {
-            *val_box = h->vals[idx];
+    // copy of _mdict_read_index, but modified to SIMD store after break
+    uint32_t h2 = hash & 0x7f;
+    const uint32_t step_basis = GROUP_WIDTH >> 3;
+    uint32_t mask = _flags_size(h->num_buckets) - 1;
+    mask &= ~(step_basis - 1);  // e.g. mask should select 0,2,4,6 if 64 buckets, flags_size 8, num_groups 4
+    uint32_t flags_index = (hash >> 7) & mask;
+    uint32_t step = step_basis;
+
+    // this should loop `num_groups` times
+    //  1. mask + step_basis = flags_size
+    //  2. flags_size / step_basis = num_groups
+    g_t group;
+    uint32_t offset;
+    while (step <= mask + step_basis) {
+        group = _group_load(&h->flags[flags_index]);
+        gbits matches = _group_match(group, h2);
+        while (_gbits_has_next(matches)) {
+            offset = _gbits_next(&matches);
+            uint32_t index = _match_index(flags_index, offset);
+            if (KEY_EQ(_get_key(h->keys, index), key)) {  // likely
+                if (val_box != NULL) {
+                    *val_box = h->vals[index];
+                }
+                if (should_replace) {
+                    h->vals[index] = val;
+                }
+                return false;
+            }
         }
-        if (should_replace) {
-            h->vals[idx] = val;
+        gbits empties = _group_mask_empty(group);
+        if (empties) {  // likely
+            offset = _gbits_next(&empties);
+            break;
         }
-        return false;
+
+        flags_index = (flags_index + step) & mask;
+        step += step_basis;
     }
     
-    idx = -idx - 1;
+    uint32_t idx = _match_index(flags_index, offset);
     _bucket_set(h->flags, idx, hash & 0x7f);
     if (!_set_key(h->keys, idx, key)) {
         h->error_code = -2;

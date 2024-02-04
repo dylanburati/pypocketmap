@@ -454,7 +454,7 @@ static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t
 #ifdef ABSL_IS_BIG_ENDIAN
   res = gbswap_64(res);
 #endif
-` memcpy(dst, &res, sizeof v);
+  memcpy(dst, &res, sizeof res);
 }
 #endif  // ABSL_INTERNAL_HAVE_ARM_NEON && ABSL_IS_LITTLE_ENDIAN
 
@@ -532,7 +532,7 @@ static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t
 #ifdef ABSL_IS_BIG_ENDIAN
   res = gbswap_64(res);
 #endif
-` memcpy(dst, &res, sizeof v);
+  memcpy(dst, &res, sizeof res);
 }
 #endif
 
