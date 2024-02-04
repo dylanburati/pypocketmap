@@ -339,6 +339,9 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
 }
 
 static void mdict_clear(h_t* h) {
+#ifdef KEYS_POINT
+    _mdict_clear_keys(h);
+#endif
     memset(h->flags, FLAGS_EMPTY, _flags_size(h->num_buckets) * sizeof(uint64_t));
     h->size = 0;
     h->num_deleted = 0;

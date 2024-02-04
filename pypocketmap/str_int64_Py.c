@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -485,6 +486,77 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
 }
 
 /**
+ * Formats the map as a string
+ */
+static PyObject* _repr_(dictObj* self) {
+    h_t* h = self->ht;
+    if (h->size == 0) {
+        return PyUnicode_FromString("<pypocketmap[str, int64]: {}>");
+    }
+
+    _PyUnicodeWriter writer;
+    _PyUnicodeWriter_Init(&writer);
+    writer.overallocate = 1;
+    /* "<pypocketmap[str, int64]: {" + "'': 2" + ", '_': 4" * (len - 1) + "}>" */
+    writer.min_length = 1 + 23 + 3 + 5 + (2 + 6) * (h->size - 1) + 2;
+
+    if (_PyUnicodeWriter_WriteASCIIString(&writer, "<pypocketmap[str, int64]: {", 1 + 23 + 3) < 0) {
+        _PyUnicodeWriter_Dealloc(&writer);
+        return NULL;
+    }
+    k_t key;
+    PyObject* key_obj = NULL;
+    PyObject* key_repr;
+    char value_repr[21];  // long enough for -9223372036854775808 with null terminator
+    bool first = true;
+    for (uint32_t i = 0; i < h->num_buckets; i++) {
+        if (_bucket_is_live(h->flags, i)) {
+            if (!first) {
+                if (_PyUnicodeWriter_WriteASCIIString(&writer, ", ", 2) < 0) {
+                    _PyUnicodeWriter_Dealloc(&writer);
+                    return NULL;
+                }
+            }
+            first = false;
+            key = _get_key(h->keys, i);
+            key_obj = PyUnicode_FromStringAndSize(key.ptr, key.len);
+            if (key_obj == NULL) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                return NULL;
+            }
+            key_repr = PyObject_Repr(key_obj);
+            if (key_repr == NULL) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                Py_CLEAR(key_obj);
+                return NULL;
+            }
+            if (_PyUnicodeWriter_WriteStr(&writer, key_repr) < 0) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                Py_CLEAR(key_obj);
+                return NULL;
+            }
+            Py_CLEAR(key_obj);
+
+            if (_PyUnicodeWriter_WriteASCIIString(&writer, ": ", 2) < 0) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                return NULL;
+            }
+            size_t value_len = snprintf(value_repr, 20, "%lld", h->vals[i]);
+            if (_PyUnicodeWriter_WriteASCIIString(&writer, value_repr, value_len) < 0) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                return NULL;
+            }
+        }
+    }
+    if (_PyUnicodeWriter_WriteASCIIString(&writer, "}>", 2) < 0) {
+        _PyUnicodeWriter_Dealloc(&writer);
+        return NULL;
+    }
+
+    return _PyUnicodeWriter_Finish(&writer);
+}
+
+/**
  * Returns an iterator for keys when __iter__(dict) is called 
  */
 static PyObject* keys(dictObj* self) {
@@ -568,6 +640,7 @@ static PyTypeObject dictType_str_int64 = {
     .tp_iter = (getiterfunc) keys,
     .tp_iternext = (iternextfunc) key_iternext,
     .tp_richcompare = (richcmpfunc) _richcmp_,
+    .tp_repr = (reprfunc) _repr_,
 };
 
 /**
