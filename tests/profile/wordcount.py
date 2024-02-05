@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print(m)
     rng = np.random.default_rng(0)
 
-    scale = 2 / 0.7
+    scale = 2.5
     lanes = (
         ((rng.exponential(scale, (100, 100)).astype(np.uint32) | 64) << 24)
         | ((rng.exponential(scale, (100, 100)).astype(np.uint32) | 64) << 16)
@@ -25,8 +25,8 @@ if __name__ == "__main__":
     while i < iterations:
         b = lanes.tobytes()
         st = 0
-        lx = np.cumsum(np.pad(rng.poisson(8, 5000), (1, 0)))
-        for j in range(5000):
+        lx = np.cumsum(np.pad(2 + rng.poisson(8, 4000), (1, 0)))
+        for j in range(4000):
             en = lx[j+1]
             if en > len(b):
                 break
