@@ -60,3 +60,7 @@ The following code snippet shows common uses of the library.
 
 ```
 __
+### To-do list
+
+- `update` should work when `PyDict_Check` returns true ***or*** `PyMapping_Keys` returns non-null
+    - `__or__` and `__ior__` operators can be implemented with this

@@ -371,7 +371,7 @@ static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t ha
   _mm_storeu_si128((g_t*) dst, res);
 }
 
-static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {
+static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t* dst) {
   g_t msbs = _mm_set1_epi8((char) (-128));
   g_t x126 = _mm_set1_epi8((char) 126);
 #ifdef ABSL_INTERNAL_HAVE_SSSE3
@@ -465,7 +465,7 @@ static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t ha
   memcpy(dst, &res, sizeof res);
 }
 
-static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {
+static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t* dst) {
   uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(ctrl), 0);
   const uint64_t slsbs = 0x0202020202020202ULL;
   const uint64_t midbs = 0x7e7e7e7e7e7e7e7eULL;
@@ -554,7 +554,7 @@ static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t ha
   memcpy(dst, &res, sizeof res);
 }
 
-static void _group_convert_special_to_full_and_empty_to_deleted(g_t ctrl, int8_t* dst) {
+static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t* dst) {
   const uint64_t lsbs = 0x0101010101010101ULL;
   g_t x = ctrl & 0x8080808080808080ULL;
   g_t res = (~x + (x >> 7)) & ~lsbs;
