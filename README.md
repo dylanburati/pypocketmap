@@ -62,5 +62,14 @@ The following code snippet shows common uses of the library.
 __
 ### To-do list
 
-- `update` should work when `PyDict_Check` returns true ***or*** `PyMapping_Keys` returns non-null
+- Add automatic or manual `shrink_to_fit`
+- Iterators should be created on the fly and the default iterator should only be used if its refcount is
+  zero.
+- Iter-next functions should throw an exception if the table has been rehashed, instead of potentially
+  skipping elements or yielding them twice.
+- `update` should work on any arg when `PyDict_Check` returns true ***or*** `PyMapping_Keys` returns non-null
     - `__or__` and `__ior__` operators can be implemented with this
+- The [METH\_FASTCALL](https://docs.python.org/3/c-api/structures.html#c.METH_FASTCALL) convention is
+  stable since Python 3.10, and it should be possible to alter the \*Py.c files to use it in place of
+  METH\_VARARGS when compiling for 3.10+.
+

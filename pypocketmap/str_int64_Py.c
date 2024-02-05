@@ -274,6 +274,27 @@ static PyObject* pop(dictObj* self, PyObject* args) {
 }
 
 /**
+ * dict.popitem() invokes this function.
+ */
+static PyObject* popitem(dictObj* self) {
+    h_t* h = self->ht;
+    uint32_t idx;
+    if (!mdict_prepare_remove_item(h, &idx)) {
+        PyErr_SetString(PyExc_KeyError, "The map is empty");
+        return NULL;
+    }
+    k_t key = _get_key(h->keys, idx);
+    v_t val = h->vals[idx];
+    PyObject* key_obj = PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
+    mdict_remove_item(h, idx);
+    if (key_obj == NULL) {
+        return NULL;
+    }
+
+    return PyTuple_Pack(2, key_obj, PyLong_FromLongLong(val));
+}
+
+/**
  * This is invoked for the python expression d.setdefault(key, [default]). If no default is passed, zero is used.
  */
 static PyObject* setdefault(dictObj* self, PyObject* args) {
@@ -328,14 +349,13 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
     while (PyDict_Next(dict, &pos, &key_obj, &value_obj)) {
         val = (v_t) PyLong_AsLongLong(value_obj);
         if (val == -1 && PyErr_Occurred()) {
-            PyErr_SetString(PyExc_TypeError, "Values must be integers in the range [-2**63, 2**63)");
             return -1;
         }
 
         key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
         if (key.ptr == NULL) {
             PyErr_SetString(PyExc_TypeError, "Key must be a string");
-            return NULL;
+            return -1;
         }
         key.len = len;
 
@@ -436,7 +456,6 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
 
     v_t val = (v_t) PyLong_AsLongLong(val_obj);
     if (val == -1 && PyErr_Occurred()) {
-        PyErr_SetString(PyExc_TypeError, "Values must be integers in the range [-2**63, 2**63)");
         return -1;
     }
 
@@ -585,9 +604,12 @@ static PyObject* items(dictObj* self) {
  * Returns a new pypocketmap containing all items present in this hashtable when dict.copy() is called.
  */
 static PyObject* copy(dictObj* self) {
-    PyObject* args = Py_BuildValue("I", self->ht->num_buckets);
+    PyObject* args = Py_BuildValue("(I)", self->ht->num_buckets);
     dictObj* new_obj = (dictObj *) PyObject_CallObject((PyObject *)((PyObject *) self)->ob_type, args);
     Py_DECREF(args);
+    if (new_obj == NULL) {
+        return NULL;
+    }
     _update_from_mdict(new_obj, self);
     return (PyObject*) new_obj;
 }
@@ -597,13 +619,14 @@ static PyObject* update(dictObj* self, PyObject* args);
 static PyMethodDef methods_str_str[] = {
     {"get", (PyCFunction)get, METH_VARARGS, "Return the value for `key` if `key` is in the dictionary, else `default`. If `default` is not given, it defaults to None, so that this method never raises a KeyError."},
     {"pop", (PyCFunction)pop, METH_VARARGS, "If key is in the dictionary, remove it and return its value, else return `default`. If `default` is not given and `key` is not in the dictionary, a KeyError is raised."},
+    {"popitem", (PyCFunction)popitem, METH_NOARGS, "Remove and return a (key, value) pair from the dictionary."},
     {"setdefault", (PyCFunction)setdefault, METH_VARARGS, "If `key` is in the dictionary, return its value. If not, insert `key` with a value of `default` and return `default`. default defaults to 0."},
-    {"clear", (PyCFunction)clear, METH_VARARGS, "Remove all items from the dictionary."},
+    {"clear", (PyCFunction)clear, METH_NOARGS, "Remove all items from the dictionary."},
     {"update", (PyCFunction)update, METH_VARARGS, "Updates the map with all key-value pairs within the given input."},
-    {"keys", (PyCFunction)keys, METH_VARARGS, "Returns an iterator over the map's keys"},
-    {"values", (PyCFunction)values, METH_VARARGS, "Returns an iterator over the map's values"},
-    {"items", (PyCFunction)items, METH_VARARGS, "Returns an iterator over the map's (key, value) pairs"},
-    {"copy", (PyCFunction)copy, METH_VARARGS, "Returns a deep copy of the hashtable"},
+    {"keys", (PyCFunction)keys, METH_NOARGS, "Returns an iterator over the map's keys"},
+    {"values", (PyCFunction)values, METH_NOARGS, "Returns an iterator over the map's values"},
+    {"items", (PyCFunction)items, METH_NOARGS, "Returns an iterator over the map's (key, value) pairs"},
+    {"copy", (PyCFunction)copy, METH_NOARGS, "Returns a deep copy of the hashtable"},
     {NULL, NULL, 0, NULL}
 };
 

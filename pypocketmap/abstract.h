@@ -457,6 +457,30 @@ static inline bool mdict_remove(h_t* h, k_t key, v_t* val_box) {
     return true;
 }
 
+static inline bool mdict_prepare_remove_item(h_t* h, uint32_t* idx_box) {
+    if (h->size == 0) {
+        return false;
+    }
+    uint32_t mask = h->num_buckets - 1;
+
+    for (uint32_t idx = rand() & mask, ct = 0; ct <= mask; idx = (idx + 1) & mask, ct++) {
+        if (_bucket_is_live(h->flags, idx)) {
+            *idx_box = idx;
+            return true;
+        }
+    }
+
+    assert(false);
+    return false;
+}
+
+static inline void mdict_remove_item(h_t* h, uint32_t idx) {
+    _unset_key(h->keys, idx);
+    _bucket_set(h->flags, idx, FLAGS_DELETED);
+    h->size--;
+    h->num_deleted++;
+}
+
 static inline bool mdict_get(h_t* h, k_t key, v_t* val_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
