@@ -176,7 +176,7 @@ static inline uint32_t _match_index(uint32_t flags_index, uint32_t offset) {
     return (flags_index << 3) + offset;
 }
 
-static int _mdict_resize(h_t* h, uint32_t new_num_buckets, bool first);
+static int _mdict_resize(h_t* h, uint32_t new_num_buckets);
 
 static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
     h_t* h = (h_t*)calloc(1, sizeof(h_t));
@@ -184,14 +184,17 @@ static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
     h->size = 0;
     h->num_deleted = 0;
     h->is_map = is_map;
+    h->flags = NULL;
+    h->keys = NULL;
+    h->vals = NULL;
     if (num_buckets < 32) {
-        if (_mdict_resize(h, 32, true) == -1) {
+        if (_mdict_resize(h, 32) == -1) {
             free(h);
             return NULL;
         }
     } else {
         uint32_t initial = 1u << (32 - count_leading_zeroes_unchecked32(num_buckets - 1));
-        if (_mdict_resize(h, initial, true) == -1) {
+        if (_mdict_resize(h, initial) == -1) {
             free(h);
             return NULL;
         }
@@ -255,18 +258,14 @@ static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, ui
 }
 
 // Caller is responsible for rehashing and clearing anything currently marked deleted
-static int _mdict_resize(h_t* h, uint32_t new_num_buckets, bool first) {
-    uint64_t* new_flags;
-    if (first) new_flags = (uint64_t*) calloc(_flags_size(new_num_buckets), sizeof(uint64_t));
-    else new_flags = (uint64_t*) realloc((void*) h->flags, _flags_size(new_num_buckets) * sizeof(uint64_t));
+static int _mdict_resize(h_t* h, uint32_t new_num_buckets) {
+    uint64_t* new_flags = (uint64_t*) realloc((void*) h->flags, _flags_size(new_num_buckets) * sizeof(uint64_t));
 
     if (!new_flags) {
         return -1;
     }
 
-    pk_t *new_keys;
-    if (first) new_keys = (pk_t*) calloc(new_num_buckets, sizeof(pk_t));
-    else new_keys = (pk_t*) realloc((void*) h->keys, new_num_buckets * sizeof(pk_t));
+    pk_t* new_keys = (pk_t*) realloc((void*) h->keys, new_num_buckets * sizeof(pk_t));
 
     if (!new_keys) {
         free(new_flags);
@@ -275,9 +274,7 @@ static int _mdict_resize(h_t* h, uint32_t new_num_buckets, bool first) {
     h->keys = new_keys;
 
     if (h->is_map) {
-        v_t *new_vals;
-        if (first) new_vals = (v_t*) calloc(new_num_buckets, sizeof(v_t));
-        else new_vals = (v_t*) realloc((void*) h->vals, new_num_buckets * sizeof(v_t));
+        v_t* new_vals = (v_t*) realloc((void*) h->vals, new_num_buckets * sizeof(v_t));
 
         if (!new_vals) {
             free(new_flags);
@@ -304,7 +301,7 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
     uint32_t new_flags_size = _flags_size(new_num_buckets);
     uint32_t new_mask = new_flags_size - 1;
     new_mask &= ~(step_basis - 1);  // e.g. mask should select 0,2,4,6 if 64 buckets, flags_size 8, num_groups 4
-    if (_mdict_resize(h, new_num_buckets, false) == -1) {
+    if (_mdict_resize(h, new_num_buckets) == -1) {
         h->error_code = -1;
     }
 
