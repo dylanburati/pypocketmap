@@ -177,7 +177,6 @@
 #ifndef MICRODICT_SIMD_H_
 #define MICRODICT_SIMD_H_
 
-#include <stdalign.h>
 #include <stdbool.h>
 #include <limits.h>
 #include "./bits.h"
@@ -327,7 +326,7 @@ static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
       _mm256_movemask_epi8(_mm256_cmpgt_epi8(special, ctrl)) + 1));
 }
 
-alignas(32) const uint32_t __sll_permutations[8][8] = {
+_Alignas(32) const uint32_t __sll_permutations[8][8] = {
   { 0, 1, 2, 3, 4, 5, 6, 7 }, { 1, 0, 2, 3, 4, 5, 6, 7 },
   { 2, 1, 0, 3, 4, 5, 6, 7 }, { 3, 1, 2, 0, 4, 5, 6, 7 },
   { 4, 1, 2, 3, 0, 5, 6, 7 }, { 5, 1, 2, 3, 4, 0, 6, 7 },
