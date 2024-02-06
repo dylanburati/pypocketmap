@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # skip musl and pypy
 skip = ["*-musllinux*", "pp*", "*-win_arm64"]
 test-command = "python -X dev -m unittest discover -s {project}/tests/unit"
-test-skip = ["*-win_arm64"]
+test-skip = ["*-macosx_universal2:arm64", "*-macosx_arm64"]
 build-frontend = "build"
 
 [tool.cibuildwheel.macos]
@@ -17,4 +17,4 @@ archs = ["x86_64", "universal2", "arm64"]
 archs = ["i686", "x86_64", "aarch64"]
 
 [tool.cibuildwheel.windows]
-archs = ["x86", "AMD64", "ARM64"]
+archs = ["x86", "AMD64"]
