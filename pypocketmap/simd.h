@@ -268,6 +268,16 @@
 #include <arm_neon.h>
 #endif
 
+#if defined(__clang__) || defined(__GNUC__)
+#define ABSL_ALIGNED(x) __attribute__((aligned(x)))
+#define ABSL_ALIGNED_SUPPORT 1
+#elif defined(_MSC_VER)
+#define ABSL_ALIGNED(x) __declspec(align(x))
+#define ABSL_ALIGNED_SUPPORT 1
+#else
+#define ABSL_ALIGNED(x)
+#endif
+
 const uint8_t FLAGS_EMPTY = 128;     // 0b10000000 
 const uint8_t FLAGS_DELETED = 254;   // 0b11111110
 const uint8_t FLAGS_SENTINEL = 255;  // 0b11111111
@@ -326,7 +336,7 @@ static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
       _mm256_movemask_epi8(_mm256_cmpgt_epi8(special, ctrl)) + 1));
 }
 
-_Alignas(32) const uint32_t __sll_permutations[8][8] = {
+ABSL_ALIGNED(32) const uint32_t __sll_permutations[8][8] = {
   { 0, 1, 2, 3, 4, 5, 6, 7 }, { 1, 0, 2, 3, 4, 5, 6, 7 },
   { 2, 1, 0, 3, 4, 5, 6, 7 }, { 3, 1, 2, 0, 4, 5, 6, 7 },
   { 4, 1, 2, 3, 0, 5, 6, 7 }, { 5, 1, 2, 3, 4, 0, 6, 7 },
@@ -336,7 +346,11 @@ _Alignas(32) const uint32_t __sll_permutations[8][8] = {
 static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t hash) {
   // only works because ctrl:kEmpty = -128
   g_t ghash = _mm256_setr_epi32(((uint32_t)(0x80 | hash)) << ((offset & 3) << 3), 0, 0, 0, 0, 0, 0, 0);
+#ifdef ABSL_ALIGNED_SUPPORT
   g_t perm = _mm256_load_si256((g_t*) &__sll_permutations[offset >> 2]);
+#else
+  g_t perm = _mm256_loadu_si256((g_t*) &__sll_permutations[offset >> 2]);
+#endif
   ghash = _mm256_permutevar8x32_epi32(ghash, perm);
   g_t res = _mm256_xor_si256(ctrl, ghash);
   _mm256_storeu_si256((g_t*) dst, res);
