@@ -5,7 +5,7 @@ NOTE: this package is in alpha. The current repo only contains
 I add support for the other key/value type combinations.
 
 A high performance python hash table library that consumes significantly less
-memory than Python Dictionaries. It currently supports Python 3.5+. It is forked from
+memory than Python Dictionaries. It currently supports Python 3.6+. It is forked from
 [Microdict](https://github.com/touqir14/Microdict) to remove the limitation on the
 length of string keys, and add utility methods like `get` and `setdefault`.
 It also has a slightly different table design, making use of code ported to
