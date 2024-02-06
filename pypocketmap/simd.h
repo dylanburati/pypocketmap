@@ -177,6 +177,7 @@
 #ifndef MICRODICT_SIMD_H_
 #define MICRODICT_SIMD_H_
 
+#include <stdalign.h>
 #include <stdbool.h>
 #include <limits.h>
 #include "./bits.h"
@@ -228,6 +229,13 @@
 #define ABSL_INTERNAL_HAVE_SSSE3 1
 #endif
 
+#ifdef ABSL_INTERNAL_HAVE_AVX2
+#error ABSL_INTERNAL_HAVE_AVX2 cannot be directly set
+#elif defined(__AVX2__)
+#define ABSL_INTERNAL_HAVE_AVX2 1
+#endif
+
+
 // ABSL_INTERNAL_HAVE_ARM_NEON is used for compile-time detection of NEON (ARM
 // SIMD).
 //
@@ -249,6 +257,10 @@
 #include <tmmintrin.h>
 #endif
 
+#ifdef ABSL_INTERNAL_HAVE_AVX2
+#include <immintrin.h>
+#endif
+
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
@@ -265,7 +277,81 @@ const int8_t FLAGS_DELETED_SIGNED = -2;
 const int8_t FLAGS_SENTINEL_SIGNED = -1;
 // any full entry will be a 0 | (7-bit h2 value), greater than FLAGS_SENTINEL when interpreted as int8_t
 
-#ifdef ABSL_INTERNAL_HAVE_SSE2
+#if defined(ABSL_INTERNAL_HAVE_AVX2)
+
+#define GROUP_WIDTH 32
+typedef __m256i g_t;
+typedef uint32_t gbits;
+
+static inline int _gbits_next(gbits* mut_bitmask) {
+  int result = count_trailing_zeroes32(*mut_bitmask);
+  *mut_bitmask &= (*mut_bitmask - 1);
+  return result;
+}
+
+static inline bool _gbits_has_next(gbits bitmask) {
+  return bitmask;
+}
+
+static inline g_t _group_load(const uint64_t* pos) {
+  return _mm256_loadu_si256((const __m256i*) pos);
+}
+
+// Returns a bitmask representing the positions of slots that match hash.
+static inline gbits _group_match(g_t ctrl, uint8_t hash) {
+  g_t match = _mm256_set1_epi8((char) hash);
+  return (gbits) (_mm256_movemask_epi8(_mm256_cmpeq_epi8(match, ctrl)));
+}
+
+// Returns a bitmask representing the positions of empty slots.
+static inline gbits _group_mask_empty(g_t ctrl) {
+  // This only works because ctrl_t::kEmpty is -128.
+  return _mm256_movemask_epi8(_mm256_sign_epi8(ctrl, ctrl));
+}
+
+// Returns a bitmask representing the positions of full slots.
+static inline gbits _group_mask_full(g_t ctrl) {
+  return (gbits) (_mm256_movemask_epi8(ctrl)) ^ 0xffffffffU;
+}
+
+// Returns a bitmask representing the positions of empty or deleted slots.
+static inline gbits _group_mask_empty_or_deleted(g_t ctrl) {
+  g_t special = _mm256_set1_epi8((char) FLAGS_SENTINEL);
+  return (gbits) _mm256_movemask_epi8(_mm256_cmpgt_epi8(special, ctrl));
+}
+
+// Returns the number of leading empty or deleted elements in the group.
+static inline uint32_t _group_count_leading_empty_or_deleted(g_t ctrl) {
+  g_t special = _mm256_set1_epi8((char) FLAGS_SENTINEL);
+  return count_trailing_zeroes32((uint32_t) (
+      _mm256_movemask_epi8(_mm256_cmpgt_epi8(special, ctrl)) + 1));
+}
+
+alignas(32) const uint32_t __sll_permutations[8][8] = {
+  { 0, 1, 2, 3, 4, 5, 6, 7 }, { 1, 0, 2, 3, 4, 5, 6, 7 },
+  { 2, 1, 0, 3, 4, 5, 6, 7 }, { 3, 1, 2, 0, 4, 5, 6, 7 },
+  { 4, 1, 2, 3, 0, 5, 6, 7 }, { 5, 1, 2, 3, 4, 0, 6, 7 },
+  { 6, 1, 2, 3, 4, 5, 0, 7 }, { 7, 1, 2, 3, 4, 5, 6, 0 }
+};
+// sets the octet at `ctrl` bits [offset*8..offset*8+8] to the given hash
+static inline void _group_set(g_t ctrl, int8_t* dst, uint32_t offset, uint8_t hash) {
+  // only works because ctrl:kEmpty = -128
+  g_t ghash = _mm256_setr_epi32(((uint32_t)(0x80 | hash)) << ((offset & 3) << 3), 0, 0, 0, 0, 0, 0, 0);
+  g_t perm = _mm256_load_si256((g_t*) &__sll_permutations[offset >> 2]);
+  ghash = _mm256_permutevar8x32_epi32(ghash, perm);
+  g_t res = _mm256_xor_si256(ctrl, ghash);
+  _mm256_storeu_si256((g_t*) dst, res);
+}
+
+static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t* dst) {
+  g_t msbs = _mm256_set1_epi8((char) (-128));
+  g_t x126 = _mm256_set1_epi8((char) 126);
+  // res[i] = (ctrl[i] sign bit ? 0 : 126) | 128
+  g_t res = _mm256_or_si256(_mm256_shuffle_epi8(x126, ctrl), msbs);
+  _mm256_storeu_si256((g_t*) dst, res);
+}
+
+#elif defined(ABSL_INTERNAL_HAVE_SSE2)
 // Quick reference guide for intrinsics used below:
 //
 // * __m128i: An XMM (128-bit) word.
@@ -384,9 +470,7 @@ static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t
   _mm_storeu_si128((g_t*) dst, res);
 }
 
-#endif  // ABSL_INTERNAL_RAW_HASH_SET_HAVE_SSE2
-
-#if defined(ABSL_INTERNAL_HAVE_ARM_NEON) && defined(ABSL_IS_LITTLE_ENDIAN)
+#elif defined(ABSL_INTERNAL_HAVE_ARM_NEON) && defined(ABSL_IS_LITTLE_ENDIAN)
 #define GROUP_WIDTH 8
 typedef uint8x8_t g_t;
 
@@ -476,9 +560,7 @@ static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t
 #endif
   memcpy(dst, &res, sizeof res);
 }
-#endif  // ABSL_INTERNAL_HAVE_ARM_NEON && ABSL_IS_LITTLE_ENDIAN
-
-#ifndef GROUP_WIDTH
+#else
 #define GROUP_WIDTH 8
 typedef uint64_t g_t;
 typedef uint64_t gbits;
@@ -563,6 +645,6 @@ static void _group_convert_special_to_empty_and_full_to_deleted(g_t ctrl, int8_t
 #endif
   memcpy(dst, &res, sizeof res);
 }
-#endif
+#endif  // SIMD availability switch
 
 #endif  // MICRODICT_SIMD_H_
