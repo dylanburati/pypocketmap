@@ -1,6 +1,7 @@
 import os
 import platform
 import sys
+import tempfile
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from setuptools.command.build_ext import build_ext as BuildCommand
@@ -10,6 +11,37 @@ import distutils.log as logging
 parent_dir = "pypocketmap"
 if sys.platform == "darwin" and "APPVEYOR" in os.environ:
     os.environ["CC"] = "gcc-8"
+
+
+def returns_success(compiler, src, extra_postargs):
+    """Return a boolean indicating whether funcname is supported on
+    the current platform.  The optional arguments can be used to
+    augment the compilation environment.
+    """
+    fd, fname = tempfile.mkstemp(".c", "", text=True)
+    f = os.fdopen(fd, "w")
+    try:
+        f.write(src)
+    finally:
+        f.close()
+    try:
+        objects = compiler.compile([fname], extra_postargs=extra_postargs)
+    except Exception:
+        return False
+    finally:
+        os.remove(fname)
+    files = list(objects)
+    try:
+        compiler.link_executable(objects, "a.out", libraries=[], library_dirs=[])
+        exc_file = os.path.join(compiler.output_dir or "", "a.out")
+        files.append(exc_file)
+        assert os.spawnv(os.P_WAIT, exc_file, []) == 0
+    except Exception:
+        return False
+    finally:
+        for fn in files:
+            os.remove(fn)
+    return True
 
 
 class MyBuildCommand(BuildCommand):
@@ -38,13 +70,31 @@ class MyBuildCommand(BuildCommand):
             family = "arm64" if ("64" in family) else "arm32"
         if family == "x86_64" and self.plat_name and "32" in self.plat_name:
             family = "i386"
-        extra_c, extra_p = self.EXTRA_COMPILE_ARGS[ck]
-        ext.extra_compile_args = (
-            extra_c + extra_p.get(family, []) + (ext.extra_compile_args or [])
-        )
+        extra_c, per_platform = self.EXTRA_COMPILE_ARGS[ck]
+        extra_p = per_platform.get(family, [])
+        if "-mavx2" in extra_p:
+            src = """
+            #include <immintrin.h>
+            int main (int argc, char** argv) {
+            __m256i a = _mm256_set_epi64x(0xffffffff00000000ULL, 0xffffffff00000000ULL,
+                                          0xffffffff00000000ULL, 0xffffffff00000000ULL);
+            __m256i b = _mm256_set_epi64x(0x00000000ffffffffULL, 0x00000000ffffffffULL,
+                                          0x00000000ffffffffULL, 0x00000000ffffffffULL);
+            return (int) (1 == _mm256_testz_si256(a, b));
+            }
+            """.strip()
+            if not returns_success(self.compiler, src, ["-mavx2"]):
+                self.announce("[setup.py] failed check: -mavx2", logging.ERROR)
+                extra_p.remove("-mavx2")
+        ext.extra_compile_args = extra_c + extra_p + (ext.extra_compile_args or [])
         self.announce(
-            "compiler:{} compiler_family:{} plat_name:{} machine:{} machine_family:{} -> {!r}".format(
-                self.compiler.compiler_type, ck, self.plat_name, pk, family, ext.extra_compile_args
+            "[setup.py] compiler:{} compiler_family:{} plat_name:{} machine:{} machine_family:{} -> {!r}".format(
+                self.compiler.compiler_type,
+                ck,
+                self.plat_name,
+                pk,
+                family,
+                ext.extra_compile_args,
             ),
             logging.WARN,
         )
