@@ -10,10 +10,10 @@ memory than Python Dictionaries. It currently supports Python 3.5+. It is forked
 length of string keys, and add utility methods like `get` and `setdefault`.
 It also has a slightly different table design, making use of code ported to
 C from [abseil-cpp](https://github.com/abseil/abseil-cpp).
-__
+
 ### Benchmarks
 The latest charts are at https://observablehq.com/@dylan-burati-ws/pypocketmap-benchmarks
-__
+
 ### Installation and Building
 You can install Microdict using pip: `pip install pypocketmap`.
 
@@ -59,7 +59,7 @@ The following code snippet shows common uses of the library.
 0
 
 ```
-__
+
 ### To-do list
 
 - Add automatic or manual `shrink_to_fit`
