@@ -13,19 +13,18 @@
 
 typedef struct {
     PyObject_HEAD
-    h_t* ht;    
-    uint32_t iter_idx;
-} iterObj;
+    h_t* ht;
+    bool valid_ht;
+} dictObj;
 
 typedef struct {
     PyObject_HEAD
-    h_t* ht;
-    bool valid_ht;
-    iterObj* key_iterator;
-    iterObj* value_iterator;
-    iterObj* item_iterator;
-} dictObj;
+    dictObj* owner;
+    uint32_t iter_idx;
+} iterObj;
 
+static void iter_dealloc(iterObj* self);
+static int iter_traverse(iterObj* self, visitproc visit, void* arg);
 static PyObject* key_iter(iterObj* self);
 static PyObject* key_iternext(iterObj* self);
 static PyObject* value_iter(iterObj* self);
@@ -39,9 +38,10 @@ static PyTypeObject keyIterType_str_int64 = {
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_new = PyType_GenericNew,
-    .tp_iter = (getiterfunc) key_iter,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_dealloc = (destructor) iter_dealloc,
+    .tp_traverse = (traverseproc) iter_traverse,
+    .tp_iter = PyObject_SelfIter,
     .tp_iternext = (iternextfunc) key_iternext,
 };
 
@@ -51,9 +51,10 @@ static PyTypeObject valueIterType_str_int64 = {
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_new = PyType_GenericNew,
-    .tp_iter = (getiterfunc) value_iter,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_dealloc = (destructor) iter_dealloc,
+    .tp_traverse = (traverseproc) iter_traverse,
+    .tp_iter = PyObject_SelfIter,
     .tp_iternext = (iternextfunc) value_iternext,
 };
 
@@ -63,26 +64,44 @@ static PyTypeObject itemIterType_str_int64 = {
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_new = PyType_GenericNew,
-    .tp_iter = (getiterfunc) item_iter,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_dealloc = (destructor) iter_dealloc,
+    .tp_traverse = (traverseproc) iter_traverse,
+    .tp_iter = PyObject_SelfIter,
     .tp_iternext = (iternextfunc) item_iternext,
 };
 
-/**
- * Returns an iterator for iterating over the dictionary keys. This function is invoked when dict.keys() method is called.
- */
-static PyObject* key_iter(iterObj* self) {
-    Py_INCREF(self);
-    self->iter_idx = 0;
-    return (PyObject *) self;    
+static PyObject* iter_new(dictObj* owner, PyTypeObject* itertype) {
+    iterObj* iterator = PyObject_GC_New(iterObj, itertype);
+    if (iterator == NULL) {
+        return NULL;
+    }
+    Py_INCREF(owner);
+    iterator->owner = owner;
+    iterator->iter_idx = 0;
+    PyObject_GC_Track(iterator);
+    return (PyObject *)iterator;
+}
+
+static void iter_dealloc(iterObj* self) {
+    PyObject_GC_UnTrack(self);
+    Py_XDECREF(self->owner);
+    PyObject_GC_Del(self);
+}
+
+static int iter_traverse(iterObj* self, visitproc visit, void* arg) {
+    Py_VISIT(self->owner);
+    return 0;
 }
 
 /**
  * Iterates over the keyss when __next__ is called on the iterator. Each time this function is called by __next__, the next keys is returned.
  */
 static PyObject* key_iternext(iterObj* self) {
-    h_t* h = self->ht;
+    if (self->owner == NULL) {
+        return NULL;
+    }
+    h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = _get_key(h->keys, i);
@@ -95,19 +114,13 @@ static PyObject* key_iternext(iterObj* self) {
 }
 
 /**
- * Returns an iterator for iterating over the dictionary values. This function is invoked when dict.values() method is called.
- */
-static PyObject* value_iter(iterObj* self) {
-    Py_INCREF(self);
-    self->iter_idx = 0;
-    return (PyObject *) self;    
-}
-
-/**
  * Iterates over the values when __next__ is called on the iterator. Each time this function is called by __next__, the next value is returned.
  */
 static PyObject* value_iternext(iterObj* self) {
-    h_t* h = self->ht;
+    if (self->owner == NULL) {
+        return NULL;
+    }
+    h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
             self->iter_idx = i+1;
@@ -119,20 +132,13 @@ static PyObject* value_iternext(iterObj* self) {
 }
 
 /**
- * Returns an iterator for iterating over the dictionary items. This function is invoked when dict.items() method is called.
- */
-static PyObject* item_iter(iterObj* self) {
-    Py_INCREF(self);
-    self->iter_idx = 0;
-    return (PyObject *) self;    
-}
-
-
-/**
  * Iterates over the items when __next__ is called on the iterator. Each time this function is called by __next__, the next item (key, value) is returned.
  */
 static PyObject* item_iternext(iterObj* self) {
-    h_t* h = self->ht;
+    if (self->owner == NULL) {
+        return NULL;
+    }
+    h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = _get_key(h->keys, i);
@@ -144,9 +150,9 @@ static PyObject* item_iternext(iterObj* self) {
     return NULL;
 }
 
-/*
-Called by the destructor for deleting the hashtable.
-*/
+/**
+ * Called by the destructor for deleting the hashtable.
+ */
 void _destroy(dictObj* self) {
     if (self->valid_ht) {
         mdict_destroy(self->ht);
@@ -194,18 +200,6 @@ static int custom_init(dictObj* self, PyObject *args) {
     }
 
     _create(self, num_buckets);
-
-    self->key_iterator = (iterObj *) keyIterType_str_int64.tp_alloc(&keyIterType_str_int64, 0);
-    self->key_iterator->ht = self->ht;
-    self->key_iterator->iter_idx = 0;
-
-    self->value_iterator = (iterObj *) valueIterType_str_int64.tp_alloc(&valueIterType_str_int64, 0); 
-    self->value_iterator->ht = self->ht;
-    self->value_iterator->iter_idx = 0;
-
-    self->item_iterator = (iterObj *) itemIterType_str_int64.tp_alloc(&itemIterType_str_int64, 0); 
-    self->item_iterator->ht = self->ht;
-    self->item_iterator->iter_idx = 0;
 
     return 0;
 }
@@ -328,10 +322,6 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
  */
 static PyObject* clear(dictObj* self) {
     mdict_clear(self->ht);
-    self->value_iterator->ht = self->ht;
-    self->value_iterator->iter_idx = 0;
-    self->item_iterator->ht = self->ht;
-    self->item_iterator->iter_idx = 0;
     return Py_BuildValue("");
 }
 
@@ -579,25 +569,21 @@ static PyObject* _repr_(dictObj* self) {
  * Returns an iterator for keys when __iter__(dict) is called 
  */
 static PyObject* keys(dictObj* self) {
-    self->key_iterator->iter_idx = 0;
-    Py_INCREF((PyObject*) self->key_iterator);
-    return (PyObject*) self->key_iterator;
+    return iter_new(self, &keyIterType_str_int64);
 }
 
 /**
  * Returns the value iterator
  */
 static PyObject* values(dictObj* self) {
-    Py_INCREF((PyObject*) self->value_iterator);
-    return (PyObject*) self->value_iterator;
+    return iter_new(self, &valueIterType_str_int64);
 }
 
 /**
  * Returns the item iterator
  */
 static PyObject* items(dictObj* self) {
-    Py_INCREF((PyObject*) self->item_iterator);
-    return (PyObject*) self->item_iterator;    
+    return iter_new(self, &itemIterType_str_int64);
 }
 
 /**
@@ -616,7 +602,7 @@ static PyObject* copy(dictObj* self) {
 
 static PyObject* update(dictObj* self, PyObject* args);
 
-static PyMethodDef methods_str_str[] = {
+static PyMethodDef methods_str_int64[] = {
     {"get", (PyCFunction)get, METH_VARARGS, "Return the value for `key` if `key` is in the dictionary, else `default`. If `default` is not given, it defaults to None, so that this method never raises a KeyError."},
     {"pop", (PyCFunction)pop, METH_VARARGS, "If key is in the dictionary, remove it and return its value, else return `default`. If `default` is not given and `key` is not in the dictionary, a KeyError is raised."},
     {"popitem", (PyCFunction)popitem, METH_NOARGS, "Remove and return a (key, value) pair from the dictionary."},
@@ -657,7 +643,7 @@ static PyTypeObject dictType_str_int64 = {
     .tp_new = (newfunc) custom_new,
     .tp_init = (initproc) custom_init,
     .tp_dealloc = (destructor) custom_dealloc,
-    .tp_methods = methods_str_str,
+    .tp_methods = methods_str_int64,
     .tp_as_sequence = &sequence_str_int64,
     .tp_as_mapping = &mapping_str_int64,
     .tp_iter = (getiterfunc) keys,
