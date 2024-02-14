@@ -7,6 +7,7 @@
 #include "./flags.h"
 #include "./bits.h"
 #include "./simd.h"
+#include "./packed.h"
 
 #ifndef KEY_TYPE_TAG
 #define KEY_TYPE_TAG TYPE_TAG_STR
@@ -17,138 +18,114 @@
 typedef int32_t k_t;
 typedef int32_t pk_t;
 #define KEY_EQ(a, b) ((a) == (b))
+#define KEY_GET(arr, idx) packed_get_i32(arr, idx)
+#define KEY_SET(arr, idx, elem) packed_set_i32(arr, idx, elem)
+#define KEY_UNSET(arr, idx) packed_unset_i32(arr, idx)
 static inline uint32_t _hash_func(k_t key) { return (uint32_t) key; }
-static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
-    keys[idx] = k;
-    return true;
-}
-static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t k_t;
 typedef int64_t pk_t;
 #define KEY_EQ(a, b) ((a) == (b))
+#define KEY_GET(arr, idx) packed_get_i64(arr, idx)
+#define KEY_SET(arr, idx, elem) packed_set_i64(arr, idx, elem)
+#define KEY_UNSET(arr, idx) packed_unset_i64(arr, idx)
 static inline uint32_t _hash_func(k_t key) { return ((uint32_t) key) ^ ((uint32_t) (key >> 32)); }
-static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
-    keys[idx] = k;
-    return true;
-}
-static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;
 typedef float pk_t;
 #define KEY_EQ(a, b) ((a) == (b))
+#define KEY_GET(arr, idx) packed_get_f32(arr, idx)
+#define KEY_SET(arr, idx, elem) packed_set_f32(arr, idx, elem)
+#define KEY_UNSET(arr, idx) packed_unset_f32(arr, idx)
 static inline uint32_t _hash_func(k_t key) {
     uint32_t ikey = *((uint32_t*) &key);
     return ikey ^ (ikey >> 16);
 }
-static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
-    keys[idx] = k;
-    return true;
-}
-static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F64
 typedef double k_t;
 typedef double pk_t;
 #define KEY_EQ(a, b) ((a) == (b))
+#define KEY_GET(arr, idx) packed_get_f64(arr, idx)
+#define KEY_SET(arr, idx, elem) packed_set_f64(arr, idx, elem)
+#define KEY_UNSET(arr, idx) packed_unset_f64(arr, idx)
 static inline uint32_t _hash_func(k_t key) {
     uint64_t ikey64 = *((uint64_t*) &key);
     uint32_t ikey = ((uint32_t) ikey) ^ ((uint32_t) (ikey >> 32))
     return ikey ^ (ikey >> 16);
 }
-static inline k_t _get_key(pk_t* keys, uint32_t idx) { return keys[idx]; }
-static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
-    keys[idx] = k;
-    return true;
-}
-static inline void _unset_key(pk_t* keys, uint32_t idx) {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_STR
-typedef struct {
-    const char* ptr;
-    uint64_t len;
-} k_t;
-typedef struct {
-    char data[15];
-    uint8_t meta;
-} pk_contained;
-typedef struct {
-    char* ptr;
-#if UINTPTR_MAX == 0xffffffff
-        uint32_t __pad;
-#endif
-    uint64_t meta;
-} pk_spilled;
-typedef union {
-    pk_contained contained;
-    pk_spilled spilled;
-} pk_t;
+typedef str_t k_t;
+typedef packed_str_t pk_t;
 #define KEY_EQ(a, b) ((a.len == b.len) && memcmp(a.ptr, b.ptr, a.len) == 0)
+#define KEY_GET(arr, idx) packed_get_str(arr, idx)
+#define KEY_SET(arr, idx, elem) packed_set_str(arr, idx, elem)
+#define KEY_UNSET(arr, idx) packed_unset_str(arr, idx)
 #define KEYS_POINT 1
 #include "./wyhash.h"
 const uint64_t transparent_xor[5] = {0, 0, 0, 0, 0};
 static inline uint32_t _hash_func(k_t key) {
     return (uint32_t) (wyhash((void*) key.ptr, key.len, 1, transparent_xor));
 }
-static inline k_t _get_key(pk_t* keys, uint32_t idx) {
-    k_t res;
-    if (keys[idx].contained.meta & 1) {
-        res.ptr = keys[idx].contained.data;
-        res.len = keys[idx].contained.meta >> 1;
-        return res;
-    }
-    res.ptr = keys[idx].spilled.ptr;
-    res.len = keys[idx].spilled.meta >> 1;
-    return res;
-}
-static inline bool _set_key(pk_t* keys, uint32_t idx, k_t k) {
-    if (k.len < 15) {
-        memcpy(keys[idx].contained.data, k.ptr, k.len+1);
-        keys[idx].contained.meta = (k.len << 1) | 1;
-    } else {
-        keys[idx].spilled.ptr = (char*) malloc(k.len+1);
-        if (keys[idx].spilled.ptr == NULL) return false;
-        memcpy(keys[idx].spilled.ptr, k.ptr, k.len+1);
-        keys[idx].spilled.meta = k.len << 1;
-    }
-    return true;
-}
-static inline void _unset_key(pk_t* keys, uint32_t idx) {
-    if (!(keys[idx].contained.meta & 1)) {
-        free(keys[idx].spilled.ptr);
-    }
-}
 #endif
 
 #if VAL_TYPE_TAG == TYPE_TAG_I32
 typedef int32_t v_t;
+typedef int32_t pv_t;
+#define VAL_EQ(a, b) ((a) == (b))
+#define VAL_GET(arr, idx) packed_get_i32(arr, idx)
+#define VAL_SET(arr, idx, elem) packed_set_i32(arr, idx, elem)
+#define VAL_UNSET(arr, idx) packed_unset_i32(arr, idx)
+
 #elif VAL_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t v_t;
+typedef int64_t pv_t;
+#define VAL_EQ(a, b) ((a) == (b))
+#define VAL_GET(arr, idx) packed_get_i64(arr, idx)
+#define VAL_SET(arr, idx, elem) packed_set_i64(arr, idx, elem)
+#define VAL_UNSET(arr, idx) packed_unset_i64(arr, idx)
+
 #elif VAL_TYPE_TAG == TYPE_TAG_F32
 typedef float v_t;
+typedef float pv_t;
+#define VAL_EQ(a, b) ((a) == (b))
+#define VAL_GET(arr, idx) packed_get_f32(arr, idx)
+#define VAL_SET(arr, idx, elem) packed_set_f32(arr, idx, elem)
+#define VAL_UNSET(arr, idx) packed_unset_f32(arr, idx)
+
 #elif VAL_TYPE_TAG == TYPE_TAG_F64
 typedef double v_t;
+typedef double pv_t;
+#define VAL_EQ(a, b) ((a) == (b))
+#define VAL_GET(arr, idx) packed_get_f64(arr, idx)
+#define VAL_SET(arr, idx, elem) packed_set_f64(arr, idx, elem)
+#define VAL_UNSET(arr, idx) packed_unset_f64(arr, idx)
+
 #elif VAL_TYPE_TAG == TYPE_TAG_STR
-typedef char* v_t;
+typedef str_t v_t;
+typedef packed_str_t pv_t;
+#define VAL_EQ(a, b) ((a.len == b.len) && memcmp(a.ptr, b.ptr, a.len) == 0)
+#define VAL_GET(arr, idx) packed_get_str(arr, idx)
+#define VAL_SET(arr, idx, elem) packed_set_str(arr, idx, elem)
+#define VAL_UNSET(arr, idx) packed_unset_str(arr, idx)
+#define VALS_POINT 1
+
 #endif
 
 const double PEAK_LOAD = 0.79;
 
 typedef struct {
+    uint64_t *flags;  // each 8 bits refers to a bucket; see simd constants
+    pk_t *keys;
+    pv_t *vals;
     uint32_t num_buckets;
     uint32_t num_deleted;
     uint32_t size;
     uint32_t upper_bound;  // floor(PEAK_LOAD * num_buckets)
     uint32_t grow_threshold;  // size below this threshold when hitting upper_bound means rehash at eq num_buckets
-    uint32_t seed;
-    uint64_t *flags;  // each 8 bits refers to a bucket; see simd constants
-    pk_t *keys;
-    v_t *vals;
     int error_code;
     bool is_map;
 } h_t;
@@ -207,7 +184,15 @@ static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
 static void _mdict_clear_keys(h_t* h) {
     for (uint32_t j = 0; j < h->num_buckets; ++j) {
         if (_bucket_is_live(h->flags, j)) {
-            _unset_key(h->keys, j);
+            KEY_UNSET(h->keys, j);
+        }
+    }
+}
+
+static void _mdict_clear_vals(h_t* h) {
+    for (uint32_t j = 0; j < h->num_buckets; ++j) {
+        if (_bucket_is_live(h->flags, j)) {
+            VAL_UNSET(h->vals, j);
         }
     }
 }
@@ -217,8 +202,11 @@ static void mdict_destroy(h_t* h) {
 #ifdef KEYS_POINT
         _mdict_clear_keys(h);
 #endif
-        free((void *)h->keys);
+#ifdef VALS_POINT
+        _mdict_clear_vals(h);
+#endif
         free(h->flags);
+        free((void *)h->keys);
         free((void *)h->vals);
         free(h);
     }
@@ -240,7 +228,7 @@ static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, ui
         while (_gbits_has_next(matches)) {
             uint32_t offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (KEY_EQ(_get_key(h->keys, index), key)) {  // likely
+            if (KEY_EQ(KEY_GET(h->keys, index), key)) {  // likely
                 return index;
             }
         }
@@ -315,11 +303,11 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
     while (j < old_num_buckets) {
         if (_bucket_is_deleted(h->flags, j)) {
             pk_t key = h->keys[j];
-            v_t val;
+            pv_t val;
             if (h->is_map) {
                 val = h->vals[j];
             }
-            uint32_t hash = _hash_func(_get_key(h->keys, j));
+            uint32_t hash = _hash_func(KEY_GET(h->keys, j));
             uint32_t flags_index = (hash >> 7) & new_mask;
             uint32_t h2 = hash & 0x7f;
             uint32_t step = step_basis;
@@ -377,6 +365,8 @@ static void mdict_clear(h_t* h) {
     h->num_deleted = 0;
 }
 
+// Returns true if the set is an _insert_, false if it is a _replace_ or an error occurred.
+// Caller is responsible for freeing the value placed in val_box if VALS_POINT is defined.
 static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should_replace) {
     if (h->size + h->num_deleted >= h->upper_bound) {
         uint32_t new_num_buckets = (h->size >= h->grow_threshold) ? (h->num_buckets << 1) : h->num_buckets;
@@ -406,12 +396,12 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should
         while (_gbits_has_next(matches)) {
             offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (KEY_EQ(_get_key(h->keys, index), key)) {  // likely
+            if (KEY_EQ(KEY_GET(h->keys, index), key)) {  // likely
                 if (val_box != NULL) {
-                    *val_box = h->vals[index];
+                    *val_box = VAL_GET(h->vals, index);
                 }
                 if (should_replace) {
-                    h->vals[index] = val;
+                    VAL_SET(h->vals, index, val);
                 }
                 return false;
             }
@@ -428,29 +418,25 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should
 
     _group_set(group, (int8_t*) &h->flags[flags_index], offset, h2);
     uint32_t idx = _match_index(flags_index, offset);
-    if (!_set_key(h->keys, idx, key)) {
+    if (!KEY_SET(h->keys, idx, key)) {
         h->error_code = -2;
         return false;
     }
-    h->vals[idx] = val;
+    if (!VAL_SET(h->vals, idx, val)) {
+        h->error_code = -2;
+        return false;
+    }
     h->size++;
     return true;
 }
 
-static inline bool mdict_remove(h_t* h, k_t key, v_t* val_box) {
+static inline bool mdict_prepare_remove(h_t* h, k_t key, uint32_t* idx_box) {
     uint32_t hash = _hash_func(key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
         return false;
     }
-
-    _bucket_set(h->flags, idx, FLAGS_DELETED);
-    _unset_key(h->keys, idx);
-    if (val_box != NULL) {
-        *val_box = h->vals[idx];
-    }
-    h->size--;
-    h->num_deleted++;
+    *idx_box = (uint32_t) idx;
     return true;
 }
 
@@ -472,7 +458,8 @@ static inline bool mdict_prepare_remove_item(h_t* h, uint32_t* idx_box) {
 }
 
 static inline void mdict_remove_item(h_t* h, uint32_t idx) {
-    _unset_key(h->keys, idx);
+    KEY_UNSET(h->keys, idx);
+    VAL_UNSET(h->vals, idx);
     _bucket_set(h->flags, idx, FLAGS_DELETED);
     h->size--;
     h->num_deleted++;
@@ -485,7 +472,7 @@ static inline bool mdict_get(h_t* h, k_t key, v_t* val_box) {
         return false;
     }
 
-    *val_box = h->vals[idx];
+    *val_box = VAL_GET(h->vals, idx);
     return true;
 }
 

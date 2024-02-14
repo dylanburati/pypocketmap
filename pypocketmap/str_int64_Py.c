@@ -7,6 +7,7 @@
 #include <Python.h>
 
 #include "flags.h"
+/* template(2)! #define KEY_TYPE_TAG \(.key.typeTag)\n#define VAL_TYPE_TAG \(.val.typeTag) */
 #define KEY_TYPE_TAG TYPE_TAG_STR
 #define VAL_TYPE_TAG TYPE_TAG_I64
 #include "abstract.h"
@@ -32,6 +33,7 @@ static PyObject* value_iternext(iterObj* self);
 static PyObject* item_iter(iterObj* self);
 static PyObject* item_iternext(iterObj* self);
 
+/* template(3)! static PyTypeObject keyIterType_\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = "pypocketmap_keys[\(.key_disp), \(.val.disp)]", */
 static PyTypeObject keyIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "pypocketmap_keys[str, int64]",
@@ -42,9 +44,11 @@ static PyTypeObject keyIterType_str_int64 = {
     .tp_dealloc = (destructor) iter_dealloc,
     .tp_traverse = (traverseproc) iter_traverse,
     .tp_iter = PyObject_SelfIter,
+    /* template! .tp_iternext = (iternextfunc) key_iternext, */
     .tp_iternext = (iternextfunc) key_iternext,
 };
 
+/* template(3)! static PyTypeObject valueIterType\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = "pypocketmap_values[\(.key_disp), \(.val.disp)]", */
 static PyTypeObject valueIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "pypocketmap_values[str, int64]",
@@ -55,9 +59,11 @@ static PyTypeObject valueIterType_str_int64 = {
     .tp_dealloc = (destructor) iter_dealloc,
     .tp_traverse = (traverseproc) iter_traverse,
     .tp_iter = PyObject_SelfIter,
+    /* template! .tp_iternext = (iternextfunc) value_iternext, */
     .tp_iternext = (iternextfunc) value_iternext,
 };
 
+/* template(3)! static PyTypeObject itemIterType\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = "pypocketmap_items[\(.key_disp), \(.val.disp)]", */
 static PyTypeObject itemIterType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "pypocketmap_items[str, int64]",
@@ -68,6 +74,7 @@ static PyTypeObject itemIterType_str_int64 = {
     .tp_dealloc = (destructor) iter_dealloc,
     .tp_traverse = (traverseproc) iter_traverse,
     .tp_iter = PyObject_SelfIter,
+    /* template! .tp_iternext = (iternextfunc) item_iternext, */
     .tp_iternext = (iternextfunc) item_iternext,
 };
 
@@ -104,8 +111,9 @@ static PyObject* key_iternext(iterObj* self) {
     h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = _get_key(h->keys, i);
+            k_t key = KEY_GET(h->keys, i);
             self->iter_idx = i+1;
+            /* template! return \([.key.type, "key"] | to_py); */
             return PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
         }
     }
@@ -123,8 +131,10 @@ static PyObject* value_iternext(iterObj* self) {
     h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
+            v_t val = VAL_GET(h->vals, i);
             self->iter_idx = i+1;
-            return PyLong_FromLongLong(h->vals[i]);
+            /* template! return \([.val.type, "val"] | to_py); */
+            return PyLong_FromLongLong(val);
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -141,9 +151,11 @@ static PyObject* item_iternext(iterObj* self) {
     h_t* h = self->owner->ht;
     for (uint32_t i = self->iter_idx; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = _get_key(h->keys, i);
+            k_t key = KEY_GET(h->keys, i);
+            v_t val = VAL_GET(h->vals, i);
             self->iter_idx = i+1;
-            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyLong_FromLongLong(h->vals[i]));
+            /* template! return PyTupleValuePack(2, \([.key.type, "key"] | to_py), \([.val.type, "val"] | to_py)); */
+            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyLong_FromLongLong(val));
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -165,11 +177,11 @@ void _destroy(dictObj* self) {
  */
 void _create(dictObj* self, uint32_t num_buckets){
     if (!self->valid_ht) {
-        self->ht = mdict_create(num_buckets, true);  
+        self->ht = mdict_create(num_buckets, true);
         self->valid_ht = true;
     }
 }
- 
+
 /**
  * The destructor
  */
@@ -216,6 +228,7 @@ static PyObject* get(dictObj* self, PyObject* args) {
     }
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
@@ -231,6 +244,7 @@ static PyObject* get(dictObj* self, PyObject* args) {
         }
         return Py_BuildValue("");
     }
+    /* template! return \([.val.type, "val"] | to_py); */
     return PyLong_FromLongLong(val);
 }
 
@@ -248,6 +262,7 @@ static PyObject* pop(dictObj* self, PyObject* args) {
 
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
@@ -255,16 +270,21 @@ static PyObject* pop(dictObj* self, PyObject* args) {
     }
     key.len = len;
 
-    v_t v;
-    if (!mdict_remove(self->ht, key, &v)) {
+    uint32_t idx;
+    if (!mdict_prepare_remove(self->ht, key, &idx)) {
         if (default_obj != NULL) {
             Py_INCREF(default_obj);
             return default_obj;
         }
+        /* template! PyErr_SetString(PyExc_KeyError, \([.key.type, "key"] | to_cstr)); */
         PyErr_SetString(PyExc_KeyError, key.ptr);
         return NULL;
     }
-    return PyLong_FromLongLong(v);
+    v_t val = VAL_GET(self->ht->vals, idx);
+    /* template! PyObject* res = \([.val.type, "val"] | to_py); */
+    PyObject* res = PyLong_FromLongLong(val);
+    mdict_remove_item(self->ht, idx);
+    return res;
 }
 
 /**
@@ -277,15 +297,18 @@ static PyObject* popitem(dictObj* self) {
         PyErr_SetString(PyExc_KeyError, "The map is empty");
         return NULL;
     }
-    k_t key = _get_key(h->keys, idx);
-    v_t val = h->vals[idx];
+    k_t key = KEY_GET(h->keys, idx);
+    v_t val = VAL_GET(h->vals, idx);
+    /* template! PyObject* key_obj = \([.key.type, "key"] | to_py); */
     PyObject* key_obj = PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
+    /* template! PyObject* val_obj = \([.val.type, "val"] | to_py); */
+    PyObject* val_obj = PyLong_FromLongLong(val);
     mdict_remove_item(h, idx);
     if (key_obj == NULL) {
         return NULL;
     }
 
-    return PyTuple_Pack(2, key_obj, PyLong_FromLongLong(val));
+    return PyTuple_Pack(2, key_obj, val_obj);
 }
 
 /**
@@ -293,27 +316,32 @@ static PyObject* popitem(dictObj* self) {
  */
 static PyObject* setdefault(dictObj* self, PyObject* args) {
     PyObject* key_obj;
+    /* template! v_t dfault = \(.val.zero); */
     v_t dfault = 0;
 
+    /* if (!PyArg_ParseTuple(args, \"O|\(.val.pycode)\", &key_obj, &dfault)) { */ 
     if (!PyArg_ParseTuple(args, "O|L", &key_obj, &dfault)) {
         return NULL;
     }
 
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
         return NULL;
     }
     key.len = len;
- 
-    // can use &dfault as val_box because the default doesn't need to be read
+
+    // Can use &dfault as val_box because we return directly after writing to the box.
+    // Nothing is removed so by a set with `should_replace=false` so no need to `free`.
     mdict_set(self->ht, key, dfault, &dfault, false);
     if (self->ht->error_code) {
         PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
         return NULL;
     }
+    /* template! return \([.val.type, "dfault"] | to_py); */
     return PyLong_FromLongLong(dfault);
 }
 
@@ -336,12 +364,15 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
     Py_ssize_t len;
     k_t key;
     v_t val;
+    v_t previous;
     while (PyDict_Next(dict, &pos, &key_obj, &value_obj)) {
+        /* template(4)! \([.val.type, "value_obj", "val"] | from_py) */
         val = (v_t) PyLong_AsLongLong(value_obj);
         if (val == -1 && PyErr_Occurred()) {
             return -1;
         }
 
+        /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
         key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
         if (key.ptr == NULL) {
             PyErr_SetString(PyExc_TypeError, "Key must be a string");
@@ -349,14 +380,20 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
         }
         key.len = len;
 
-        mdict_set(self->ht, key, val, NULL, true);
-        if (self->ht->error_code) {
-            PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
-            return -1;
+        if (!mdict_set(self->ht, key, val, &previous, true)) {
+            if (self->ht->error_code) {
+                PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
+                return -1;
+            }
+
+#ifdef VALS_POINT
+            // replaced, must free previous
+            free(previous.ptr);
+#endif
         }
     }
 
-    return 0;   
+    return 0;
 }
 
 /**
@@ -365,13 +402,20 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
 int _update_from_mdict(dictObj* self, dictObj* dict) {
     h_t* h = self->ht;
     h_t* other = dict->ht;
+    v_t previous;
 
     for (uint32_t i = 0; i < other->num_buckets; i++) {
         if (_bucket_is_live(other->flags, i)) {
-            mdict_set(h, _get_key(other->keys, i), other->vals[i], NULL, true);
-            if (self->ht->error_code) {
-                PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
-                return -1;
+            if (!mdict_set(h, KEY_GET(other->keys, i), VAL_GET(other->vals, i), &previous, true)) {
+                if (self->ht->error_code) {
+                    PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
+                    return -1;
+                }
+
+#ifdef VALS_POINT
+                // replaced, must free previous
+                free(previous.ptr);
+#endif
             }
         }
     }
@@ -384,6 +428,7 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
 static int _contains_(dictObj* self, PyObject* key_obj) {
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
@@ -408,6 +453,7 @@ static int _len_(dictObj* self) {
 static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
@@ -427,32 +473,45 @@ static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
  * This is invoked for the python expression d[key] = value. Both key and value must be of the hashtable type.
  * This is also invoke for del d[key], in which case the `val_obj` is NULL
  */
-static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* val_obj) {
+static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* value_obj) {
     k_t key;
     Py_ssize_t len;
+    /* template(6)! \([.key.type, "key_obj", "key", "len"] | from_py) */
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &len);
     if (key.ptr == NULL) {
         PyErr_SetString(PyExc_TypeError, "Key must be a string");
-        return NULL;
+        return -1;
     }
     key.len = len;
-    if (val_obj == NULL) {
-        if (!mdict_remove(self->ht, key, NULL)) {
+
+    if (value_obj == NULL) {
+        uint32_t idx;
+        if (!mdict_prepare_remove(self->ht, key, &idx)) {
+            /* template! PyErr_SetString(PyExc_KeyError, \([.key.type, "key"] | to_cstr)); */
             PyErr_SetString(PyExc_KeyError, key.ptr);
-            return NULL;
+            return -1;
         }
+        mdict_remove_item(self->ht, idx);
         return 0;
     }
 
-    v_t val = (v_t) PyLong_AsLongLong(val_obj);
+    /* template(4)! \([.val.type, "value_obj", "val"] | from_py) */
+    v_t val = (v_t) PyLong_AsLongLong(value_obj);
     if (val == -1 && PyErr_Occurred()) {
         return -1;
     }
 
-    mdict_set(self->ht, key, val, NULL, true);
-    if (self->ht->error_code) {
-        PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
-        return -1;
+    v_t previous;
+    if (!mdict_set(self->ht, key, val, &previous, true)) {
+        if (self->ht->error_code) {
+            PyErr_SetString(PyExc_MemoryError, "Insufficient memory to reserve space");
+            return -1;
+        }
+
+#ifdef VALS_POINT
+        // replaced, must free previous
+        free(previous.ptr);
+#endif
     }
     return 0;
 }
@@ -476,19 +535,21 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
     h_t* h = self->ht;
     for (uint32_t i = 0; is_equal && i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
-            k_t key = _get_key(h->keys, i);
+            k_t key = KEY_GET(h->keys, i);
+            /* template(2)! PyObject* other_val_obj = \(if .val.disp == "str" then "PyMapping_GetItemString(other, key.ptr)" else "PyObject_GetItem(other, \([.key.type, "key"] | to_py))" end); */
             PyObject* other_val_obj = PyMapping_GetItemString(other, key.ptr);
             if (other_val_obj == NULL) {
                 is_equal = false;
                 break;
             }
+            /* template(2)! \([.val.type, "other_val_obj", "val"] | partial_from_py) */
             v_t other_val = PyLong_AsLongLong(other_val_obj);
             if (other_val == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
                 is_equal = false;
                 break;
             }
-            is_equal = (h->vals[i] == other_val);
+            is_equal = VAL_EQ(VAL_GET(h->vals, i), other_val);
         }
     }
     return PyBool_FromLong((op == Py_EQ) == is_equal);
@@ -527,7 +588,7 @@ static PyObject* _repr_(dictObj* self) {
                 }
             }
             first = false;
-            key = _get_key(h->keys, i);
+            key = KEY_GET(h->keys, i);
             key_obj = PyUnicode_FromStringAndSize(key.ptr, key.len);
             if (key_obj == NULL) {
                 _PyUnicodeWriter_Dealloc(&writer);
@@ -566,9 +627,10 @@ static PyObject* _repr_(dictObj* self) {
 }
 
 /**
- * Returns an iterator for keys when __iter__(dict) is called 
+ * Returns an iterator for keys when __iter__(dict) is called
  */
 static PyObject* keys(dictObj* self) {
+    /* template! return iter_new(self, keyIterType_\(.key.disp)_\(.val.disp)); */
     return iter_new(self, &keyIterType_str_int64);
 }
 
@@ -576,6 +638,7 @@ static PyObject* keys(dictObj* self) {
  * Returns the value iterator
  */
 static PyObject* values(dictObj* self) {
+    /* template! return iter_new(self, valueIterType_\(.key.disp)_\(.val.disp)); */
     return iter_new(self, &valueIterType_str_int64);
 }
 
@@ -583,6 +646,7 @@ static PyObject* values(dictObj* self) {
  * Returns the item iterator
  */
 static PyObject* items(dictObj* self) {
+    /* template! return iter_new(self, itemIterType_\(.key.disp)_\(.val.disp)); */
     return iter_new(self, &itemIterType_str_int64);
 }
 
@@ -602,6 +666,7 @@ static PyObject* copy(dictObj* self) {
 
 static PyObject* update(dictObj* self, PyObject* args);
 
+/* template! static PyMethodDef methods_\(.key.disp)_\(.val.disp)[] = { */
 static PyMethodDef methods_str_int64[] = {
     {"get", (PyCFunction)get, METH_VARARGS, "Return the value for `key` if `key` is in the dictionary, else `default`. If `default` is not given, it defaults to None, so that this method never raises a KeyError."},
     {"pop", (PyCFunction)pop, METH_VARARGS, "If key is in the dictionary, remove it and return its value, else return `default`. If `default` is not given and `key` is not in the dictionary, a KeyError is raised."},
@@ -616,6 +681,7 @@ static PyMethodDef methods_str_int64[] = {
     {NULL, NULL, 0, NULL}
 };
 
+/* template! static PySequenceMethods sequence_\(.key.disp)_\(.val.disp) = { */
 static PySequenceMethods sequence_str_int64 = {
     (lenfunc) _len_,                    /* sq_length */
     0,                                  /* sq_concat */
@@ -627,25 +693,28 @@ static PySequenceMethods sequence_str_int64 = {
     (objobjproc) _contains_,            /* sq_contains */
 };
 
+/* template! static PyMappingMethods mapping_\(.key.disp)_\(.val.disp) = { */
 static PyMappingMethods mapping_str_int64 = {
     (lenfunc) _len_, /*mp_length*/
     (binaryfunc)_getitem_, /*mp_subscript*/
     (objobjargproc)_setitem_, /*mp_ass_subscript*/
 };
 
+/* template! static PyTypeObject dictType_\(.key.disp)_\(.val.disp) = { */
 static PyTypeObject dictType_str_int64 = {
     PyVarObject_HEAD_INIT(NULL, 0)
+    /* template(5)! .tp_name = \"pypocketmap[\(.key.disp), \(.val.disp)]\",\n.tp_doc = \"pypocketmap[\(.key.disp), \(.val.disp)]\",\n.tp_as_sequence = &sequence_\(.key.disp)_\(.val.disp),\n.tp_as_mapping = &mapping_\(.key.disp)_\(.val.disp),\n.tp_methods = methods_\(.key.disp)_\(.val.disp), */
     .tp_name = "pypocketmap[str, int64]",
-    .tp_doc = "pypocketmap[str, int64]", 
+    .tp_doc = "pypocketmap[str, int64]",
+    .tp_as_sequence = &sequence_str_int64,
+    .tp_as_mapping = &mapping_str_int64,
+    .tp_methods = methods_str_int64,
     .tp_basicsize = sizeof(dictObj),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_new = (newfunc) custom_new,
     .tp_init = (initproc) custom_init,
     .tp_dealloc = (destructor) custom_dealloc,
-    .tp_methods = methods_str_int64,
-    .tp_as_sequence = &sequence_str_int64,
-    .tp_as_mapping = &mapping_str_int64,
     .tp_iter = (getiterfunc) keys,
     .tp_iternext = (iternextfunc) key_iternext,
     .tp_richcompare = (richcmpfunc) _richcmp_,
@@ -669,7 +738,9 @@ static PyObject* update(dictObj* self, PyObject* args) {
             return NULL;
         }
 
+        /* template! if (PyObject_IsInstance(other, (PyObject *) &dictType_\(.key.disp)_\(.val.disp)) != 1) { */
         if (PyObject_IsInstance(other, (PyObject *) &dictType_str_int64) != 1) {
+            /* template! PyErr_SetString(PyExc_TypeError, "Argument needs to be either a pypocketmap[\(.key.disp), \(.val.disp)] or compatible Python dictionary\"); */
             PyErr_SetString(PyExc_TypeError, "Argument needs to be either a pypocketmap[str, int64] or compatible Python dictionary");
             return NULL;
         }
@@ -689,32 +760,40 @@ static PyObject* update(dictObj* self, PyObject* args) {
     return Py_BuildValue("");
 }
 
+/* template(4)! static struct PyModuleDef moduleDef_\(.key.disp)_\(.val.disp) = {\n    PyModuleDef_HEAD_INIT,\n    \"\(.key.disp)_\(.val.disp)\", // name of module\n    \"pypocketmap[\(.key.disp), \(.val.disp)]\", // Documentation of the module */
 static struct PyModuleDef moduleDef_str_int64 = {
     PyModuleDef_HEAD_INIT,
-    "str_int64", /* name of module */
+    "str_int64", // name of module
     "pypocketmap[str, int64]", // Documentation of the module
-    -1,   /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+    -1,   // size of per-interpreter state of the module, or -1 if the module keeps state in global variables
 };
 
+/* template! PyMODINIT_FUNC PyInit_\(.key.disp)_\(.val.disp)(void) { */
 PyMODINIT_FUNC PyInit_str_int64(void) {
     PyObject* obj;
 
+    /* template! if (PyType_Ready(&dictType_\(.key.disp)_\(.val.disp)) < 0) */
     if (PyType_Ready(&dictType_str_int64) < 0)
         return NULL;
 
+    /* template! if (PyType_Ready(&keyIterType_\(.key.disp)_\(.val.disp)) < 0) */
     if (PyType_Ready(&keyIterType_str_int64) < 0)
         return NULL;
 
+    /* template! if (PyType_Ready(&valueIterType_\(.key.disp)_\(.val.disp)) < 0) */
     if (PyType_Ready(&valueIterType_str_int64) < 0)
         return NULL;
 
+    /* template! if (PyType_Ready(&itemIterType_\(.key.disp)_\(.val.disp)) < 0) */
     if (PyType_Ready(&itemIterType_str_int64) < 0)
         return NULL;
 
+    /* template! obj = PyModule_Create(&moduleDef_\(.key.disp)_\(.val.disp)); */
     obj = PyModule_Create(&moduleDef_str_int64);
     if (obj == NULL)
         return NULL;
 
+    /* template(3)! Py_INCREF(&dictType_\(.key.disp)_\(.val.disp));\nif (PyModule_AddObject(obj, "create", (PyObject *) &dictType_\(.key.disp)_\(.val.disp)) < 0) {\n    Py_DECREF(&dictType_\(.key.disp)_\(.val.disp)); */
     Py_INCREF(&dictType_str_int64);
     if (PyModule_AddObject(obj, "create", (PyObject *) &dictType_str_int64) < 0) {
         Py_DECREF(&dictType_str_int64);

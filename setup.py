@@ -126,6 +126,7 @@ setup(
             "abstract.h",
             "bits.h",
             "flags.h",
+            "packed.h",
             "simd.h",
             "wyhash.h",
         ],

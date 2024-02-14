@@ -18,6 +18,17 @@ k_t make_key(int i, k_t* mut_key) {
 
 #define KEY(i) (make_key(i, &test_key))
 
+bool mdict_remove(h_t* h, k_t key, v_t* val_box) {
+  // safe as long as values are not pointer types
+  uint32_t idx;
+  bool res = mdict_prepare_remove(h, key, &idx);
+  if (res) {
+    *val_box = VAL_GET(h->vals, idx);
+    mdict_remove_item(h, idx);
+  }
+  return res;
+}
+
 void test_str_int64__initialize(void) {
   m = mdict_create(32, true);
   test_key.ptr = malloc(4);
@@ -34,7 +45,7 @@ void test_str_int64__cleanup(void) {
 }
 
 void test_str_int64__smallstr(void) {
-  cl_assert_equal_i(sizeof(pk_contained), sizeof(pk_spilled));
+  cl_assert_equal_i(sizeof(packed_str_contained), sizeof(packed_str_spilled));
 }
 
 void test_str_int64__lots_of_insertions(void) {
