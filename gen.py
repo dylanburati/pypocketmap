@@ -226,7 +226,7 @@ def fill_templates(configs, lines):
     return result
 
 
-src_configs = [{"key": c1, "val": c2} for c1, c2 in itertools.product(half_configs, repeat=2)]
+src_configs = [{"key": c1, "val": c2} for c1 in half_configs[-1:] for c2 in half_configs]
 first_config = None
 for c in src_configs:
     if c["key"]["disp"] == "str" and c["val"]["disp"] == "int64":

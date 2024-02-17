@@ -27,7 +27,7 @@ static inline bool packed_set_f32(float* arr, uint32_t idx, float elem) {
 }
 static inline void packed_unset_f32(float* arr, uint32_t idx) {}
 
-static inline float packed_get_f64(double* arr, uint64_t idx) { return arr[idx]; }
+static inline double packed_get_f64(double* arr, uint64_t idx) { return arr[idx]; }
 static inline bool packed_set_f64(double* arr, uint64_t idx, double elem) {
     arr[idx] = elem;
     return true;

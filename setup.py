@@ -101,6 +101,18 @@ class MyBuildCommand(BuildCommand):
         super().build_extension(ext)
 
 
+module_str_float32 = Extension(
+    "str_float32",
+    sources=[os.path.join(parent_dir, "str_float32_Py.c")]
+)
+module_str_float64 = Extension(
+    "str_float64",
+    sources=[os.path.join(parent_dir, "str_float64_Py.c")]
+)
+module_str_int32 = Extension(
+    "str_int32",
+    sources=[os.path.join(parent_dir, "str_int32_Py.c")]
+)
 module_str_int64 = Extension(
     "str_int64",
     sources=[os.path.join(parent_dir, "str_int64_Py.c")],
@@ -115,7 +127,7 @@ with open("README.md") as fh:
 
 setup(
     name="pypocketmap",
-    version="0.0.0-alpha",
+    version="0.0.1-alpha",
     author="Dylan Burati, Touqir Sajed",
     description="pypocketmap - a memory-efficient hashtable for CPython",
     long_description=long_description,
@@ -134,9 +146,22 @@ setup(
             "simd.h",
             "wyhash.h",
         ],
-        "pypocketmap._pkt_c": ["__init__.py", "str_int64.pyi", "str_str.pyi"],
+        "pypocketmap._pkt_c": [
+            "__init__.py",
+            "str_float32.pyi",
+            "str_float64.pyi",
+            "str_int32.pyi",
+            "str_int64.pyi",
+            "str_str.pyi",
+        ],
     },
-    ext_modules=[module_str_int64, module_str_str],
+    ext_modules=[
+        module_str_float32,
+        module_str_float64,
+        module_str_int32,
+        module_str_int64,
+        module_str_str,
+    ],
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
