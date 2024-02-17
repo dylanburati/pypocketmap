@@ -14,10 +14,10 @@ D = TypeVar("D")
 
 
 class Map(Collection, Generic[K, V], Protocol):
-    def __setitem__(self, key: K, value: V, /) -> None:
+    def __setitem__(self, __key: K, __value: V) -> None:
         ...
 
-    def __delitem__(self, key: K, /) -> None:
+    def __delitem__(self, __key: K) -> None:
         ...
 
     @overload
