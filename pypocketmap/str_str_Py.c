@@ -7,9 +7,8 @@
 #include <Python.h>
 
 #include "flags.h"
-/* template(2)! #define KEY_TYPE_TAG \(.key.typeTag)\n#define VAL_TYPE_TAG \(.val.typeTag) */
 #define KEY_TYPE_TAG TYPE_TAG_STR
-#define VAL_TYPE_TAG TYPE_TAG_I64
+#define VAL_TYPE_TAG TYPE_TAG_STR
 #include "abstract.h"
 
 typedef struct {
@@ -33,10 +32,9 @@ static PyObject* value_iternext(iterObj* self);
 static PyObject* item_iter(iterObj* self);
 static PyObject* item_iternext(iterObj* self);
 
-/* template(3)! static PyTypeObject keyIterType_\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = \"pypocketmap_keys[\(.key.disp), \(.val.disp)]\", */
-static PyTypeObject keyIterType_str_int64 = {
+static PyTypeObject keyIterType_str_str = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "pypocketmap_keys[str, int64]",
+    .tp_name = "pypocketmap_keys[str, str]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -47,10 +45,9 @@ static PyTypeObject keyIterType_str_int64 = {
     .tp_iternext = (iternextfunc) key_iternext,
 };
 
-/* template(3)! static PyTypeObject valueIterType_\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = \"pypocketmap_values[\(.key.disp), \(.val.disp)]\", */
-static PyTypeObject valueIterType_str_int64 = {
+static PyTypeObject valueIterType_str_str = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "pypocketmap_values[str, int64]",
+    .tp_name = "pypocketmap_values[str, str]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -61,10 +58,9 @@ static PyTypeObject valueIterType_str_int64 = {
     .tp_iternext = (iternextfunc) value_iternext,
 };
 
-/* template(3)! static PyTypeObject itemIterType_\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = \"pypocketmap_items[\(.key.disp), \(.val.disp)]\", */
-static PyTypeObject itemIterType_str_int64 = {
+static PyTypeObject itemIterType_str_str = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "pypocketmap_items[str, int64]",
+    .tp_name = "pypocketmap_items[str, str]",
     .tp_doc = "",
     .tp_basicsize = sizeof(iterObj),
     .tp_itemsize = 0,
@@ -110,7 +106,6 @@ static PyObject* key_iternext(iterObj* self) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = KEY_GET(h->keys, i);
             self->iter_idx = i+1;
-            /* template! return \([.key, "key"] | to_py); */
             return PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
         }
     }
@@ -130,8 +125,7 @@ static PyObject* value_iternext(iterObj* self) {
         if (_bucket_is_live(h->flags, i)) {
             v_t val = VAL_GET(h->vals, i);
             self->iter_idx = i+1;
-            /* template! return \([.val, "val"] | to_py); */
-            return PyLong_FromLongLong(val);
+            return PyUnicode_DecodeUTF8(val.ptr, val.len, NULL);
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -151,8 +145,7 @@ static PyObject* item_iternext(iterObj* self) {
             k_t key = KEY_GET(h->keys, i);
             v_t val = VAL_GET(h->vals, i);
             self->iter_idx = i+1;
-            /* template! return PyTuple_Pack(2, \([.key, "key"] | to_py), \([.val, "val"] | to_py)); */
-            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyLong_FromLongLong(val));
+            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyUnicode_DecodeUTF8(val.ptr, val.len, NULL));
         }
     }
     PyErr_SetNone(PyExc_StopIteration);
@@ -224,7 +217,6 @@ static PyObject* get(dictObj* self, PyObject* args) {
         return NULL;
     }
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "NULL", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -240,8 +232,7 @@ static PyObject* get(dictObj* self, PyObject* args) {
         }
         return Py_BuildValue("");
     }
-    /* template! return \([.val, "val"] | to_py); */
-    return PyLong_FromLongLong(val);
+    return PyUnicode_DecodeUTF8(val.ptr, val.len, NULL);
 }
 
 /**
@@ -257,7 +248,6 @@ static PyObject* pop(dictObj* self, PyObject* args) {
     }
 
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "NULL", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -271,13 +261,11 @@ static PyObject* pop(dictObj* self, PyObject* args) {
             Py_INCREF(default_obj);
             return default_obj;
         }
-        /* template! \([.key, "key"] | key_error); */
         PyErr_SetString(PyExc_KeyError, key.ptr);
         return NULL;
     }
     v_t val = VAL_GET(self->ht->vals, idx);
-    /* template! PyObject* res = \([.val, "val"] | to_py); */
-    PyObject* res = PyLong_FromLongLong(val);
+    PyObject* res = PyUnicode_DecodeUTF8(val.ptr, val.len, NULL);
     mdict_remove_item(self->ht, idx);
     return res;
 }
@@ -294,10 +282,8 @@ static PyObject* popitem(dictObj* self) {
     }
     k_t key = KEY_GET(h->keys, idx);
     v_t val = VAL_GET(h->vals, idx);
-    /* template! PyObject* key_obj = \([.key, "key"] | to_py); */
     PyObject* key_obj = PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
-    /* template! PyObject* val_obj = \([.val, "val"] | to_py); */
-    PyObject* val_obj = PyLong_FromLongLong(val);
+    PyObject* val_obj = PyUnicode_DecodeUTF8(val.ptr, val.len, NULL);
     mdict_remove_item(h, idx);
     if (key_obj == NULL) {
         return NULL;
@@ -311,17 +297,14 @@ static PyObject* popitem(dictObj* self) {
  */
 static PyObject* setdefault(dictObj* self, PyObject* args) {
     PyObject* key_obj;
-    /* template(0)! \(if .val.disp == "str" then "PyObject* val_obj = NULL;" else "" end) */
-    /* template! v_t dfault = \(.val.zero); */
-    v_t dfault = 0;
+    PyObject* val_obj = NULL;
+    v_t dfault = EMPTY_STR;
 
-    /* template! if (!PyArg_ParseTuple(args, \"O|\(.val.pycode)\", &key_obj, &\(if .val.disp == "str" then "val_obj" else "dfault" end))) { */
-    if (!PyArg_ParseTuple(args, "O|L", &key_obj, &dfault)) {
+    if (!PyArg_ParseTuple(args, "O|O", &key_obj, &val_obj)) {
         return NULL;
     }
 
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "NULL", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -329,7 +312,14 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
     }
     key.len = key_len;
 
-    /* template(0)! \(if .val.disp == "str" then "if (val_obj != NULL) {\n    \([.val, "val_obj", "dfault", "NULL", "dfault_len"] | from_py | gsub("\n"; "\n    "))\n}" else "" end) */
+    if (val_obj != NULL) {
+        Py_ssize_t dfault_len;
+        dfault.ptr = PyUnicode_AsUTF8AndSize(val_obj, &dfault_len);
+        if (dfault.ptr == NULL) {
+            return NULL;
+        }
+        dfault.len = dfault_len;
+    }
 
     pv_t previous;
     if (!mdict_set(self->ht, key, dfault, &previous, false)) {
@@ -339,8 +329,7 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
         }
         dfault = VAL_GET(&previous, 0);
     }
-    /* template! return \([.val, "dfault"] | to_py); */
-    return PyLong_FromLongLong(dfault);
+    return PyUnicode_DecodeUTF8(dfault.ptr, dfault.len, NULL);
 }
 
 /**
@@ -359,20 +348,19 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
     PyObject* key_obj;
     PyObject* value_obj;
     Py_ssize_t pos = 0;
-    /* template! \(if .key.disp == "str" then "Py_ssize_t key_len;" else "" end) */
     Py_ssize_t key_len;
-    /* template(0)! \(if .val.disp == "str" then "Py_ssize_t val_len;" else "" end) */
+    Py_ssize_t val_len;
     k_t key;
     v_t val;
     pv_t previous;
     while (PyDict_Next(dict, &pos, &key_obj, &value_obj)) {
-        /* template(4)! \([.val, "value_obj", "val", "-1"] | from_py) */
-        val = PyLong_AsLongLong(value_obj);
-        if (val == -1 && PyErr_Occurred()) {
+        Py_ssize_t val_len;
+        val.ptr = PyUnicode_AsUTF8AndSize(value_obj, &val_len);
+        if (val.ptr == NULL) {
             return -1;
         }
+        val.len = val_len;
 
-        /* template(5)! \([.key, "key_obj", "key", "-1", "-"] | from_py) */
         key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
         if (key.ptr == NULL) {
             return -1;
@@ -420,7 +408,6 @@ int _update_from_mdict(dictObj* self, dictObj* dict) {
  */
 static int _contains_(dictObj* self, PyObject* key_obj) {
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "-1", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -444,7 +431,6 @@ static int _len_(dictObj* self) {
  */
 static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "NULL", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -454,12 +440,10 @@ static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
 
     v_t val;
     if (!mdict_get(self->ht, key, &val)) {
-        /* template! \([.key, "key"] | key_error); */
         PyErr_SetString(PyExc_KeyError, key.ptr);
         return NULL;
     }
-    /* template! return \([.val, "val"] | to_py); */
-    return PyLong_FromLongLong(val);
+    return PyUnicode_DecodeUTF8(val.ptr, val.len, NULL);
 }
 
 /**
@@ -468,7 +452,6 @@ static PyObject* _getitem_(dictObj* self, PyObject* key_obj){
  */
 static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* value_obj) {
     k_t key;
-    /* template(6)! \([.key, "key_obj", "key", "-1", "key_len"] | from_py) */
     Py_ssize_t key_len;
     key.ptr = PyUnicode_AsUTF8AndSize(key_obj, &key_len);
     if (key.ptr == NULL) {
@@ -479,7 +462,6 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* value_obj) {
     if (value_obj == NULL) {
         uint32_t idx;
         if (!mdict_prepare_remove(self->ht, key, &idx)) {
-            /* template! \([.key, "key"] | key_error); */
             PyErr_SetString(PyExc_KeyError, key.ptr);
             return -1;
         }
@@ -488,11 +470,12 @@ static int _setitem_(dictObj* self, PyObject* key_obj, PyObject* value_obj) {
     }
 
     v_t val;
-    /* template(4)! \([.val, "value_obj", "val", "-1"] | from_py) */
-    val = PyLong_AsLongLong(value_obj);
-    if (val == -1 && PyErr_Occurred()) {
+    Py_ssize_t val_len;
+    val.ptr = PyUnicode_AsUTF8AndSize(value_obj, &val_len);
+    if (val.ptr == NULL) {
         return -1;
     }
+    val.len = val_len;
 
     pv_t previous;
     if (!mdict_set(self->ht, key, val, &previous, true)) {
@@ -522,14 +505,13 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
     }
 
     PyObject* key_obj;
-    /* template(0)! \(if .val.disp == "str" then "Py_ssize_t other_val_len;" else "" end) */
+    Py_ssize_t other_val_len;
     v_t other_val;
     bool is_equal = true;
     h_t* h = self->ht;
     for (uint32_t i = 0; is_equal && i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
             k_t key = KEY_GET(h->keys, i);
-            /* template! key_obj = \([.key, "key"] | to_py); */
             key_obj = PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
             PyObject* other_val_obj = PyObject_GetItem(other, key_obj);
             Py_CLEAR(key_obj);
@@ -538,14 +520,13 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
                 is_equal = false;
                 break;
             }
-            /* template(2)! \([.val, "other_val_obj", "other_val"] | partial_from_py) */
-            other_val = PyLong_AsLongLong(other_val_obj);
-            if (other_val == -1 && PyErr_Occurred()) {
+            other_val.ptr = PyUnicode_AsUTF8AndSize(other_val_obj, &other_val_len);
+            if (other_val.ptr == NULL) {
                 PyErr_Clear();
                 is_equal = false;
                 break;
             }
-            /* template(0)! \(if .val.disp == "str" then "other_val.len = other_val_len;" else "" end) */
+            other_val.len = other_val_len;
             is_equal = VAL_EQ(VAL_GET(h->vals, i), other_val);
         }
     }
@@ -558,14 +539,11 @@ static PyObject* _richcmp_(dictObj* self, PyObject* other, int op) {
 static PyObject* _repr_(dictObj* self) {
     h_t* h = self->ht;
     if (h->size == 0) {
-        /* template! return PyUnicode_FromString(\"<pypocketmap[\(.key.disp), \(.val.disp)]: {}>\"); */
-        return PyUnicode_FromString("<pypocketmap[str, int64]: {}>");
+        return PyUnicode_FromString("<pypocketmap[str, str]: {}>");
     }
-    /* template! const int REPR_DICT_POS = 1 + 12 + \(.key.disp | length) + 2 + \(.val.disp | length) + 3; */
-    const int REPR_DICT_POS = 1 + 12 + 3 + 2 + 5 + 3;
+    const int REPR_DICT_POS = 1 + 12 + 3 + 2 + 3 + 3;
     //               "<pypocketmap["   k ", "  v   "]: "
-    /* template! const int REPR_MIN_PAIR = 2 + \(.key.short_repr_size) + \(.val.short_repr_size); */
-    const int REPR_MIN_PAIR = 2 + 2 + 1;
+    const int REPR_MIN_PAIR = 2 + 2 + 2;
 
     _PyUnicodeWriter writer;
     _PyUnicodeWriter_Init(&writer);
@@ -573,18 +551,16 @@ static PyObject* _repr_(dictObj* self) {
     writer.min_length = REPR_DICT_POS + 1 + REPR_MIN_PAIR - 2 + REPR_MIN_PAIR * (h->size - 1) + 2;
     //            "<pypocketmap[_, _]" "{"  (k ": " v)          (", " k ": " v)*               "}>"
 
-    /* template! if (_PyUnicodeWriter_WriteASCIIString(&writer, \"<pypocketmap[\(.key.disp), \(.val.disp)]: {\", REPR_DICT_POS + 1) < 0) { */
-    if (_PyUnicodeWriter_WriteASCIIString(&writer, "<pypocketmap[str, int64]: {", REPR_DICT_POS + 1) < 0) {
+    if (_PyUnicodeWriter_WriteASCIIString(&writer, "<pypocketmap[str, str]: {", REPR_DICT_POS + 1) < 0) {
         _PyUnicodeWriter_Dealloc(&writer);
         return NULL;
     }
     k_t key;
     v_t val;
-    /* template(2)! \([.key, "key"] | repr_declare) */
     PyObject* key_obj = NULL;
     PyObject* key_repr;
-    /* template! \([.val, "val"] | repr_declare) */
-    char val_repr[48];
+    PyObject* val_obj = NULL;
+    PyObject* val_repr;
     bool first = true;
     for (uint32_t i = 0; i < h->num_buckets; i++) {
         if (_bucket_is_live(h->flags, i)) {
@@ -596,7 +572,6 @@ static PyObject* _repr_(dictObj* self) {
             }
             first = false;
             key = KEY_GET(h->keys, i);
-            /* template(17)! \([.key, "key"] | repr_write) */
             key_obj = PyUnicode_FromStringAndSize(key.ptr, key.len);
             if (key_obj == NULL) {
                 _PyUnicodeWriter_Dealloc(&writer);
@@ -621,12 +596,23 @@ static PyObject* _repr_(dictObj* self) {
             }
 
             val = VAL_GET(h->vals, i);
-            /* template(5)! \([.val, "val"] | repr_write) */
-            size_t val_len = snprintf(val_repr, 47, "%lld", val);
-            if (_PyUnicodeWriter_WriteASCIIString(&writer, val_repr, val_len) < 0) {
+            val_obj = PyUnicode_FromStringAndSize(val.ptr, val.len);
+            if (val_obj == NULL) {
                 _PyUnicodeWriter_Dealloc(&writer);
                 return NULL;
             }
+            val_repr = PyObject_Repr(val_obj);
+            if (val_repr == NULL) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                Py_CLEAR(val_obj);
+                return NULL;
+            }
+            if (_PyUnicodeWriter_WriteStr(&writer, val_repr) < 0) {
+                _PyUnicodeWriter_Dealloc(&writer);
+                Py_CLEAR(val_obj);
+                return NULL;
+            }
+            Py_CLEAR(val_obj);
         }
     }
     if (_PyUnicodeWriter_WriteASCIIString(&writer, "}>", 2) < 0) {
@@ -641,24 +627,21 @@ static PyObject* _repr_(dictObj* self) {
  * Returns an iterator for keys when __iter__(dict) is called
  */
 static PyObject* keys(dictObj* self) {
-    /* template! return iter_new(self, &keyIterType_\(.key.disp)_\(.val.disp)); */
-    return iter_new(self, &keyIterType_str_int64);
+    return iter_new(self, &keyIterType_str_str);
 }
 
 /**
  * Returns the value iterator
  */
 static PyObject* values(dictObj* self) {
-    /* template! return iter_new(self, &valueIterType_\(.key.disp)_\(.val.disp)); */
-    return iter_new(self, &valueIterType_str_int64);
+    return iter_new(self, &valueIterType_str_str);
 }
 
 /**
  * Returns the item iterator
  */
 static PyObject* items(dictObj* self) {
-    /* template! return iter_new(self, &itemIterType_\(.key.disp)_\(.val.disp)); */
-    return iter_new(self, &itemIterType_str_int64);
+    return iter_new(self, &itemIterType_str_str);
 }
 
 /**
@@ -677,8 +660,7 @@ static PyObject* copy(dictObj* self) {
 
 static PyObject* update(dictObj* self, PyObject* args);
 
-/* template! static PyMethodDef methods_\(.key.disp)_\(.val.disp)[] = { */
-static PyMethodDef methods_str_int64[] = {
+static PyMethodDef methods_str_str[] = {
     {"get", (PyCFunction)get, METH_VARARGS, "Return the value for `key` if `key` is in the dictionary, else `default`. If `default` is not given, it defaults to None, so that this method never raises a KeyError."},
     {"pop", (PyCFunction)pop, METH_VARARGS, "If key is in the dictionary, remove it and return its value, else return `default`. If `default` is not given and `key` is not in the dictionary, a KeyError is raised."},
     {"popitem", (PyCFunction)popitem, METH_NOARGS, "Remove and return a (key, value) pair from the dictionary."},
@@ -692,8 +674,7 @@ static PyMethodDef methods_str_int64[] = {
     {NULL, NULL, 0, NULL}
 };
 
-/* template! static PySequenceMethods sequence_\(.key.disp)_\(.val.disp) = { */
-static PySequenceMethods sequence_str_int64 = {
+static PySequenceMethods sequence_str_str = {
     (lenfunc) _len_,                    /* sq_length */
     0,                                  /* sq_concat */
     0,                                  /* sq_repeat */
@@ -704,22 +685,19 @@ static PySequenceMethods sequence_str_int64 = {
     (objobjproc) _contains_,            /* sq_contains */
 };
 
-/* template! static PyMappingMethods mapping_\(.key.disp)_\(.val.disp) = { */
-static PyMappingMethods mapping_str_int64 = {
+static PyMappingMethods mapping_str_str = {
     (lenfunc) _len_, /*mp_length*/
     (binaryfunc)_getitem_, /*mp_subscript*/
     (objobjargproc)_setitem_, /*mp_ass_subscript*/
 };
 
-/* template! static PyTypeObject dictType_\(.key.disp)_\(.val.disp) = { */
-static PyTypeObject dictType_str_int64 = {
+static PyTypeObject dictType_str_str = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    /* template(5)! .tp_name = \"pypocketmap[\(.key.disp), \(.val.disp)]\",\n.tp_doc = \"pypocketmap[\(.key.disp), \(.val.disp)]\",\n.tp_as_sequence = &sequence_\(.key.disp)_\(.val.disp),\n.tp_as_mapping = &mapping_\(.key.disp)_\(.val.disp),\n.tp_methods = methods_\(.key.disp)_\(.val.disp), */
-    .tp_name = "pypocketmap[str, int64]",
-    .tp_doc = "pypocketmap[str, int64]",
-    .tp_as_sequence = &sequence_str_int64,
-    .tp_as_mapping = &mapping_str_int64,
-    .tp_methods = methods_str_int64,
+    .tp_name = "pypocketmap[str, str]",
+    .tp_doc = "pypocketmap[str, str]",
+    .tp_as_sequence = &sequence_str_str,
+    .tp_as_mapping = &mapping_str_str,
+    .tp_methods = methods_str_str,
     .tp_basicsize = sizeof(dictObj),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
@@ -749,10 +727,8 @@ static PyObject* update(dictObj* self, PyObject* args) {
             return NULL;
         }
 
-        /* template! if (PyObject_IsInstance(other, (PyObject *) &dictType_\(.key.disp)_\(.val.disp)) != 1) { */
-        if (PyObject_IsInstance(other, (PyObject *) &dictType_str_int64) != 1) {
-            /* template! PyErr_SetString(PyExc_TypeError, \"Argument needs to be either a pypocketmap[\(.key.disp), \(.val.disp)] or compatible Python dictionary\"); */
-            PyErr_SetString(PyExc_TypeError, "Argument needs to be either a pypocketmap[str, int64] or compatible Python dictionary");
+        if (PyObject_IsInstance(other, (PyObject *) &dictType_str_str) != 1) {
+            PyErr_SetString(PyExc_TypeError, "Argument needs to be either a pypocketmap[str, str] or compatible Python dictionary");
             return NULL;
         }
     }
@@ -771,43 +747,35 @@ static PyObject* update(dictObj* self, PyObject* args) {
     return Py_BuildValue("");
 }
 
-/* template(4)! static struct PyModuleDef moduleDef_\(.key.disp)_\(.val.disp) = {\n    PyModuleDef_HEAD_INIT,\n    \"\(.key.disp)_\(.val.disp)\", // name of module\n    \"pypocketmap[\(.key.disp), \(.val.disp)]\", // Documentation of the module */
-static struct PyModuleDef moduleDef_str_int64 = {
+static struct PyModuleDef moduleDef_str_str = {
     PyModuleDef_HEAD_INIT,
-    "str_int64", // name of module
-    "pypocketmap[str, int64]", // Documentation of the module
+    "str_str", // name of module
+    "pypocketmap[str, str]", // Documentation of the module
     -1,   // size of per-interpreter state of the module, or -1 if the module keeps state in global variables
 };
 
-/* template! PyMODINIT_FUNC PyInit_\(.key.disp)_\(.val.disp)(void) { */
-PyMODINIT_FUNC PyInit_str_int64(void) {
+PyMODINIT_FUNC PyInit_str_str(void) {
     PyObject* obj;
 
-    /* template! if (PyType_Ready(&dictType_\(.key.disp)_\(.val.disp)) < 0) */
-    if (PyType_Ready(&dictType_str_int64) < 0)
+    if (PyType_Ready(&dictType_str_str) < 0)
         return NULL;
 
-    /* template! if (PyType_Ready(&keyIterType_\(.key.disp)_\(.val.disp)) < 0) */
-    if (PyType_Ready(&keyIterType_str_int64) < 0)
+    if (PyType_Ready(&keyIterType_str_str) < 0)
         return NULL;
 
-    /* template! if (PyType_Ready(&valueIterType_\(.key.disp)_\(.val.disp)) < 0) */
-    if (PyType_Ready(&valueIterType_str_int64) < 0)
+    if (PyType_Ready(&valueIterType_str_str) < 0)
         return NULL;
 
-    /* template! if (PyType_Ready(&itemIterType_\(.key.disp)_\(.val.disp)) < 0) */
-    if (PyType_Ready(&itemIterType_str_int64) < 0)
+    if (PyType_Ready(&itemIterType_str_str) < 0)
         return NULL;
 
-    /* template! obj = PyModule_Create(&moduleDef_\(.key.disp)_\(.val.disp)); */
-    obj = PyModule_Create(&moduleDef_str_int64);
+    obj = PyModule_Create(&moduleDef_str_str);
     if (obj == NULL)
         return NULL;
 
-    /* template(3)! Py_INCREF(&dictType_\(.key.disp)_\(.val.disp));\nif (PyModule_AddObject(obj, \"create\", (PyObject *) &dictType_\(.key.disp)_\(.val.disp)) < 0) {\n    Py_DECREF(&dictType_\(.key.disp)_\(.val.disp)); */
-    Py_INCREF(&dictType_str_int64);
-    if (PyModule_AddObject(obj, "create", (PyObject *) &dictType_str_int64) < 0) {
-        Py_DECREF(&dictType_str_int64);
+    Py_INCREF(&dictType_str_str);
+    if (PyModule_AddObject(obj, "create", (PyObject *) &dictType_str_str) < 0) {
+        Py_DECREF(&dictType_str_str);
         Py_DECREF(obj);
         return NULL;
     }

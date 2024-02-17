@@ -1,5 +1,4 @@
 #include <stdbool.h>
-#include <stdint.h>
 
 #define TYPE_TAG_I32 1
 #define TYPE_TAG_I64 2

@@ -105,6 +105,10 @@ module_str_int64 = Extension(
     "str_int64",
     sources=[os.path.join(parent_dir, "str_int64_Py.c")],
 )
+module_str_str = Extension(
+    "str_str",
+    sources=[os.path.join(parent_dir, "str_str_Py.c")],
+)
 
 with open("README.md") as fh:
     long_description = fh.read()
@@ -130,9 +134,9 @@ setup(
             "simd.h",
             "wyhash.h",
         ],
-        "pypocketmap._pkt_c": ["__init__.py", "str_int64.pyi"],
+        "pypocketmap._pkt_c": ["__init__.py", "str_int64.pyi", "str_str.pyi"],
     },
-    ext_modules=[module_str_int64],
+    ext_modules=[module_str_int64, module_str_str],
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",

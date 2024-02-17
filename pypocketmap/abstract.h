@@ -116,6 +116,8 @@ typedef packed_str_t pv_t;
 #endif
 
 const double PEAK_LOAD = 0.79;
+const char* const _EMPTY_STR_PTR = "";
+const str_t EMPTY_STR = { .ptr = _EMPTY_STR_PTR, .len = 0 };
 
 typedef struct {
     uint64_t *flags;  // each 8 bits refers to a bucket; see simd constants
@@ -360,6 +362,9 @@ static void mdict_clear(h_t* h) {
 #ifdef KEYS_POINT
     _mdict_clear_keys(h);
 #endif
+#ifdef VALS_POINT
+    _mdict_clear_vals(h);
+#endif
     memset(h->flags, FLAGS_EMPTY, _flags_size(h->num_buckets) * sizeof(uint64_t));
     h->size = 0;
     h->num_deleted = 0;
@@ -367,7 +372,7 @@ static void mdict_clear(h_t* h) {
 
 // Returns true if the set is an _insert_, false if it is a _replace_ or an error occurred.
 // Caller is responsible for freeing the value placed in val_box if VALS_POINT is defined.
-static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should_replace) {
+static inline bool mdict_set(h_t* h, k_t key, v_t val, pv_t* val_box, bool should_replace) {
     if (h->size + h->num_deleted >= h->upper_bound) {
         uint32_t new_num_buckets = (h->size >= h->grow_threshold) ? (h->num_buckets << 1) : h->num_buckets;
         _mdict_resize_rehash(h, new_num_buckets);
@@ -398,7 +403,7 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, v_t* val_box, bool should
             uint32_t index = _match_index(flags_index, offset);
             if (KEY_EQ(KEY_GET(h->keys, index), key)) {  // likely
                 if (val_box != NULL) {
-                    *val_box = VAL_GET(h->vals, index);
+                    *val_box = h->vals[index];
                 }
                 if (should_replace) {
                     VAL_SET(h->vals, index, val);

@@ -9,6 +9,7 @@ pypocketmap/tests/.clarcache
 pypocketmap/tests/clar.suite
 pypocketmap/tests/suite
 .profiles/
+.hypothesis/
 
 # Prerequisites
 *.d
