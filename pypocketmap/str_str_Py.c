@@ -298,7 +298,7 @@ static PyObject* popitem(dictObj* self) {
 static PyObject* setdefault(dictObj* self, PyObject* args) {
     PyObject* key_obj;
     PyObject* val_obj = NULL;
-    v_t dfault = { .ptr = "", .len = 0 };
+    v_t dfault = { .ptr = EMPTY_STR, .len = 0 };
 
     if (!PyArg_ParseTuple(args, "O|O", &key_obj, &val_obj)) {
         return NULL;
