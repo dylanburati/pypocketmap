@@ -11,7 +11,7 @@
 
 #ifndef KEY_TYPE_TAG
 #define KEY_TYPE_TAG TYPE_TAG_STR
-#define VAL_TYPE_TAG TYPE_TAG_I32
+#define VAL_TYPE_TAG TYPE_TAG_STR
 #endif
 
 #if KEY_TYPE_TAG == TYPE_TAG_I32
@@ -263,7 +263,7 @@ static int _mdict_resize(h_t* h, uint32_t new_num_buckets) {
     h->keys = new_keys;
 
     if (h->is_map) {
-        v_t* new_vals = (v_t*) realloc((void*) h->vals, new_num_buckets * sizeof(v_t));
+        pv_t* new_vals = (pv_t*) realloc((void*) h->vals, new_num_buckets * sizeof(pv_t));
 
         if (!new_vals) {
             free(new_flags);
