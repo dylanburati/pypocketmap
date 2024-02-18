@@ -26,11 +26,8 @@ typedef struct {
 
 static void iter_dealloc(iterObj* self);
 static int iter_traverse(iterObj* self, visitproc visit, void* arg);
-static PyObject* key_iter(iterObj* self);
 static PyObject* key_iternext(iterObj* self);
-static PyObject* value_iter(iterObj* self);
 static PyObject* value_iternext(iterObj* self);
-static PyObject* item_iter(iterObj* self);
 static PyObject* item_iternext(iterObj* self);
 
 /* template(3)! static PyTypeObject keyIterType_\(.key.disp)_\(.val.disp) = {\n    PyVarObject_HEAD_INIT(NULL, 0)\n    .tp_name = \"pypocketmap_keys[\(.key.disp), \(.val.disp)]\", */
@@ -311,12 +308,10 @@ static PyObject* popitem(dictObj* self) {
  */
 static PyObject* setdefault(dictObj* self, PyObject* args) {
     PyObject* key_obj;
-    /* template(0)! \(if .val.disp == "str" then "PyObject* val_obj = NULL;" else "" end) */
-    /* template! v_t dfault = \(.val.zero); */
-    v_t dfault = 0;
+    PyObject* val_obj = NULL;
 
-    /* template! if (!PyArg_ParseTuple(args, \"O|\(.val.pycode)\", &key_obj, &\(if .val.disp == "str" then "val_obj" else "dfault" end))) { */
-    if (!PyArg_ParseTuple(args, "O|L", &key_obj, &dfault)) {
+    /* template! if (!PyArg_ParseTuple(args, \"O|O\", &key_obj, &val_obj)) { */
+    if (!PyArg_ParseTuple(args, "O|O", &key_obj, &val_obj)) {
         return NULL;
     }
 
@@ -329,7 +324,15 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
     }
     key.len = key_len;
 
-    /* template(0)! \(if .val.disp == "str" then "if (val_obj != NULL) {\n    \([.val, "val_obj", "dfault", "NULL", "dfault_len"] | from_py | gsub("\n"; "\n    "))\n}" else "" end) */
+    /* template! v_t dfault = \(.val.zero); */
+    v_t dfault = 0;
+    if (val_obj != NULL) {
+        /* template(4)! \([.val, "val_obj", "dfault", "NULL", "dfault_len"] | from_py) */
+        dfault = PyLong_AsLongLong(val_obj);
+        if (dfault == -1 && PyErr_Occurred()) {
+            return NULL;
+        }
+    }
 
     pv_t previous;
     if (!mdict_set(self->ht, key, dfault, &previous, false)) {
@@ -366,7 +369,7 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
     v_t val;
     pv_t previous;
     while (PyDict_Next(dict, &pos, &key_obj, &value_obj)) {
-        /* template(4)! \([.val, "value_obj", "val", "-1"] | from_py) */
+        /* template(4)! \([.val, "value_obj", "val", "-1", "-"] | from_py) */
         val = PyLong_AsLongLong(value_obj);
         if (val == -1 && PyErr_Occurred()) {
             return -1;

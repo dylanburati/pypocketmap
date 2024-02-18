@@ -143,4 +143,5 @@ trait Key: Value + Hash {}
 - The [METH\_FASTCALL](https://docs.python.org/3/c-api/structures.html#c.METH_FASTCALL) convention is
   stable since Python 3.10, and it should be possible to alter the \*Py.c files to use it in place of
   METH\_VARARGS when compiling for 3.10+.
+- Additional overflow checking when `LLONG_MAX != INT64_MAX` or (more likely) `LONG_MAX != INT32_MAX`
 

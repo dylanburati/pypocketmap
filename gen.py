@@ -14,7 +14,6 @@ half_configs = [
         "from_func": "PyLong_FromLong",
         "as_func": "PyLong_AsLong",
         "format_spec": '"%ld"',
-        "pycode": "l",
         "short_repr_size": 1,
     },
     {
@@ -26,7 +25,6 @@ half_configs = [
         "from_func": "PyLong_FromLongLong",
         "as_func": "PyLong_AsLongLong",
         "format_spec": '"%lld"',
-        "pycode": "L",
         "short_repr_size": 1,
     },
     {
@@ -40,7 +38,6 @@ half_configs = [
         "as_func": "PyFloat_AsDouble",
         "cast_as": "(float) ",
         "format_spec": '"%g"',
-        "pycode": "f",
         "short_repr_size": 3,
     },
     {
@@ -52,7 +49,6 @@ half_configs = [
         "from_func": "PyFloat_FromDouble",
         "as_func": "PyFloat_AsDouble",
         "format_spec": '"%g"',
-        "pycode": "d",
         "short_repr_size": 3,
     },
     {
@@ -60,7 +56,6 @@ half_configs = [
         "disp": "str",
         "type": "char*",
         "zero": "{ .ptr = EMPTY_STR, .len = 0 }",
-        "pycode": "O",
         "short_repr_size": 2,
     },
 ]

@@ -25,11 +25,8 @@ typedef struct {
 
 static void iter_dealloc(iterObj* self);
 static int iter_traverse(iterObj* self, visitproc visit, void* arg);
-static PyObject* key_iter(iterObj* self);
 static PyObject* key_iternext(iterObj* self);
-static PyObject* value_iter(iterObj* self);
 static PyObject* value_iternext(iterObj* self);
-static PyObject* item_iter(iterObj* self);
 static PyObject* item_iternext(iterObj* self);
 
 static PyTypeObject keyIterType_str_str = {
@@ -298,7 +295,6 @@ static PyObject* popitem(dictObj* self) {
 static PyObject* setdefault(dictObj* self, PyObject* args) {
     PyObject* key_obj;
     PyObject* val_obj = NULL;
-    v_t dfault = { .ptr = EMPTY_STR, .len = 0 };
 
     if (!PyArg_ParseTuple(args, "O|O", &key_obj, &val_obj)) {
         return NULL;
@@ -312,6 +308,7 @@ static PyObject* setdefault(dictObj* self, PyObject* args) {
     }
     key.len = key_len;
 
+    v_t dfault = { .ptr = EMPTY_STR, .len = 0 };
     if (val_obj != NULL) {
         Py_ssize_t dfault_len;
         dfault.ptr = PyUnicode_AsUTF8AndSize(val_obj, &dfault_len);
@@ -354,7 +351,6 @@ int _update_from_Pydict(dictObj* self, PyObject* dict) {
     v_t val;
     pv_t previous;
     while (PyDict_Next(dict, &pos, &key_obj, &value_obj)) {
-        Py_ssize_t val_len;
         val.ptr = PyUnicode_AsUTF8AndSize(value_obj, &val_len);
         if (val.ptr == NULL) {
             return -1;
