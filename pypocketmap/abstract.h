@@ -216,7 +216,7 @@ static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, ui
         while (_gbits_has_next(matches)) {
             uint32_t offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (ABSL_PREDICT_TRUE(KEY_EQ(KEY_GET(h->keys, index), key)), 1) {
+            if (ABSL_PREDICT_TRUE(KEY_EQ(KEY_GET(h->keys, index), key))) {
                 return index;
             }
         }

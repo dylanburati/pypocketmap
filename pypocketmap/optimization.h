@@ -1,4 +1,5 @@
 #ifndef PYPOCKETMAP_OPTIMIZATION_H_
+#define PYPOCKETMAP_OPTIMIZATION_H_
 
 #if defined(__has_builtin)
 #define ABSL_HAVE_BUILTIN(x) __has_builtin(x)
