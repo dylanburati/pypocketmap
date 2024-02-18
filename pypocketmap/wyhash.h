@@ -12,16 +12,10 @@
 //includes
 #include <stdint.h>
 #include <string.h>
+#include "./optimization.h"
 #if defined(_MSC_VER) && defined(_M_X64)
   #include <intrin.h>
   #pragma intrinsic(_umul128)
-#endif
-#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__clang__)
-  #define _likely_(x)	__builtin_expect(x,1)
-  #define _unlikely_(x)	__builtin_expect(x,0)
-#else
-  #define _likely_(x) (x)
-  #define _unlikely_(x) (x)
 #endif
 //mum function
 static inline uint64_t _wyrot(uint64_t x) { return (x>>32)|(x<<32); }
@@ -83,9 +77,9 @@ static inline uint64_t _wyr3(const uint8_t *p, unsigned k) { return (((uint64_t)
 static inline uint64_t _wyfinish16(const uint8_t *p, uint64_t len, uint64_t seed, const uint64_t *secret, uint64_t i){
 #if(WYHASH_CONDOM>0)
   uint64_t a, b;
-  if(_likely_(i<=8)){
-    if(_likely_(i>=4)){ a=_wyr4(p); b=_wyr4(p+i-4); }
-    else if (_likely_(i)){ a=_wyr3(p,i); b=0; }
+  if(ABSL_PREDICT_TRUE(i<=8)){
+    if(ABSL_PREDICT_TRUE(i>=4)){ a=_wyr4(p); b=_wyr4(p+i-4); }
+    else if (ABSL_PREDICT_TRUE(i)){ a=_wyr3(p,i); b=0; }
     else a=b=0;
   } 
   else{ a=_wyr8(p); b=_wyr8(p+i-8); }
@@ -97,14 +91,14 @@ static inline uint64_t _wyfinish16(const uint8_t *p, uint64_t len, uint64_t seed
 }
 
 static inline uint64_t _wyfinish(const uint8_t *p, uint64_t len, uint64_t seed, const uint64_t *secret, uint64_t i){
-  if(_likely_(i<=16)) return _wyfinish16(p,len,seed,secret,i);
+  if(ABSL_PREDICT_TRUE(i<=16)) return _wyfinish16(p,len,seed,secret,i);
   return _wyfinish(p+16,len,_wymix(_wyr8(p)^secret[1],_wyr8(p+8)^seed),secret,i-16);
 }
 
 static inline uint64_t wyhash(const void *key, uint64_t len, uint64_t seed, const uint64_t *secret){
   const uint8_t *p=(const uint8_t *)key;
   uint64_t i=len; seed^=*secret;
-  if(_unlikely_(i>64)){
+  if(ABSL_PREDICT_FALSE(i>64)){
     uint64_t see1=seed;
     do{
       seed=_wymix(_wyr8(p)^secret[1],_wyr8(p+8)^seed)^_wymix(_wyr8(p+16)^secret[2],_wyr8(p+24)^seed);

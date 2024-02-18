@@ -16,6 +16,7 @@
 #define ABSL_NUMERIC_INTERNAL_BITS_H_
 
 #include <stdint.h>
+#include "./optimization.h"
 
 // ABSL_IS_LITTLE_ENDIAN
 // ABSL_IS_BIG_ENDIAN
@@ -51,21 +52,6 @@
 #include <intrin.h>
 #endif
 
-#if defined(__has_builtin)
-#define ABSL_HAS_BUILTIN(x) __has_builtin(x)
-#else
-#define ABSL_HAS_BUILTIN(x) 0
-#endif
-
-#if defined(__GNUC__) && !defined(__clang__)
-// GCC
-#define ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(x) 1
-#elif defined(__has_builtin)
-#define ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(x) __has_builtin(x)
-#else
-#define ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(x) 0
-#endif
-
 #if ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(__builtin_popcountl) && \
     ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(__builtin_popcountll)
 #define ABSL_INTERNAL_CONSTEXPR_POPCOUNT constexpr
@@ -94,7 +80,7 @@
 #endif
 
 static inline uint64_t gbswap_64(uint64_t host_int) {
-#if ABSL_HAS_BUILTIN(__builtin_bswap64)
+#if ABSL_HAVE_BUILTIN(__builtin_bswap64)
   return __builtin_bswap64(host_int);
 #elif defined(__GNUC__)
   return __builtin_bswap64(host_int);
@@ -200,7 +186,7 @@ static inline int count_trailing_zeroes_unchecked64(uint64_t x) {
 }
 
 static inline int count_trailing_zeroes_unchecked16(uint16_t x) {
-#if ABSL_HAS_BUILTIN(__builtin_ctzs)
+#if ABSL_HAVE_BUILTIN(__builtin_ctzs)
   // static_assert(sizeof(unsigned short) == sizeof(x),  // NOLINT(runtime/int)
   //               "__builtin_ctzs does not take 16-bit arg");
   return __builtin_ctzs(x);

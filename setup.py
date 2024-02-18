@@ -47,11 +47,11 @@ def returns_success(compiler, src, extra_postargs):
 class MyBuildCommand(BuildCommand):
     EXTRA_COMPILE_ARGS = {
         "msvc": (
-            ["/O2", "/w"],
+            ["/O2"],
             {"x86_64": ["/arch:AVX2"]},
         ),
         "unix": (
-            ["-O3", "-w"],
+            ["-O3", "-Wformat=0"],
             # arm64 intentionally excluded, NEON is a default feature according to
             # https://github.com/numpy/numpy/blob/v1.26.4/meson_cpu/arm/meson.build#L23-L26
             {"x86_64": ["-mavx2"], "arm32": ["-mfpu=neon"]},
@@ -71,6 +71,8 @@ class MyBuildCommand(BuildCommand):
         if family == "x86_64" and self.plat_name and "32" in self.plat_name:
             family = "i386"
         extra_c, per_platform = self.EXTRA_COMPILE_ARGS[ck]
+        if ck == "unix" and "CI" not in os.environ:
+            extra_c = [*extra_c, "-w"]
         extra_p = per_platform.get(family, [])
         if "-mavx2" in extra_p:
             src = """
@@ -142,6 +144,7 @@ setup(
             "abstract.h",
             "bits.h",
             "flags.h",
+            "optimization.h",
             "packed.h",
             "simd.h",
             "wyhash.h",

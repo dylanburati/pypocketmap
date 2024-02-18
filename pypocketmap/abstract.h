@@ -8,6 +8,7 @@
 #include "./bits.h"
 #include "./simd.h"
 #include "./packed.h"
+#include "./optimization.h"
 
 #ifndef KEY_TYPE_TAG
 #define KEY_TYPE_TAG TYPE_TAG_STR
@@ -182,29 +183,15 @@ static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
     return h;
 }
 
-static void _mdict_clear_keys(h_t* h) {
-    for (uint32_t j = 0; j < h->num_buckets; ++j) {
-        if (_bucket_is_live(h->flags, j)) {
-            KEY_UNSET(h->keys, j);
-        }
-    }
-}
-
-static void _mdict_clear_vals(h_t* h) {
-    for (uint32_t j = 0; j < h->num_buckets; ++j) {
-        if (_bucket_is_live(h->flags, j)) {
-            VAL_UNSET(h->vals, j);
-        }
-    }
-}
-
 static void mdict_destroy(h_t* h) {
     if (h) {
-#ifdef KEYS_POINT
-        _mdict_clear_keys(h);
-#endif
-#ifdef VALS_POINT
-        _mdict_clear_vals(h);
+#if defined(KEYS_POINT) || defined(VALS_POINT)
+        for (uint32_t j = 0; j < h->num_buckets; ++j) {
+            if (_bucket_is_live(h->flags, j)) {
+                KEY_UNSET(h->keys, j);
+                VAL_UNSET(h->vals, j);
+            }
+        }
 #endif
         free(h->flags);
         free((void *)h->keys);
@@ -229,12 +216,12 @@ static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, ui
         while (_gbits_has_next(matches)) {
             uint32_t offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (KEY_EQ(KEY_GET(h->keys, index), key)) {  // likely
+            if (ABSL_PREDICT_TRUE(KEY_EQ(KEY_GET(h->keys, index), key)), 1) {
                 return index;
             }
         }
         gbits empties = _group_mask_empty(group);
-        if (empties) {  // likely
+        if (ABSL_PREDICT_TRUE(empties)) {
             uint32_t offset = _gbits_next(&empties);
             return -((int32_t) _match_index(flags_index, offset)) - 1;
         }
@@ -243,7 +230,7 @@ static inline int32_t _mdict_read_index(h_t* h, k_t key, uint32_t hash_upper, ui
         step += step_basis;
     }
     assert(false);
-    return -h->num_buckets - 1;
+    return -((int32_t) h->num_buckets) - 1;
 }
 
 // Caller is responsible for rehashing and clearing anything currently marked deleted
@@ -358,11 +345,13 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
 }
 
 static void mdict_clear(h_t* h) {
-#ifdef KEYS_POINT
-    _mdict_clear_keys(h);
-#endif
-#ifdef VALS_POINT
-    _mdict_clear_vals(h);
+#if defined(KEYS_POINT) || defined(VALS_POINT)
+    for (uint32_t j = 0; j < h->num_buckets; ++j) {
+        if (_bucket_is_live(h->flags, j)) {
+            KEY_UNSET(h->keys, j);
+            VAL_UNSET(h->vals, j);
+        }
+    }
 #endif
     memset(h->flags, FLAGS_EMPTY, _flags_size(h->num_buckets) * sizeof(uint64_t));
     h->size = 0;
@@ -394,13 +383,13 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, pv_t* val_box, bool shoul
     //  2. flags_size / step_basis = num_groups
     g_t group;
     uint32_t offset;
-    while (step <= mask + step_basis) {
+    while (true) {
         group = _group_load(&h->flags[flags_index]);
         gbits matches = _group_match(group, h2);
         while (_gbits_has_next(matches)) {
             offset = _gbits_next(&matches);
             uint32_t index = _match_index(flags_index, offset);
-            if (KEY_EQ(KEY_GET(h->keys, index), key)) {  // likely
+            if (ABSL_PREDICT_TRUE(KEY_EQ(KEY_GET(h->keys, index), key))) {
                 if (val_box != NULL) {
                     *val_box = h->vals[index];
                 }
@@ -411,7 +400,7 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, pv_t* val_box, bool shoul
             }
         }
         gbits empties = _group_mask_empty(group);
-        if (empties) {  // likely
+        if (ABSL_PREDICT_TRUE(empties)) {
             offset = _gbits_next(&empties);
             break;
         }

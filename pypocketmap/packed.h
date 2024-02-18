@@ -78,7 +78,7 @@ static inline str_t packed_get_str(packed_str_t* arr, uint32_t idx) {
 static inline bool packed_set_str(packed_str_t* arr, uint32_t idx, str_t elem) {
     if (elem.len < 15) {
         memcpy(arr[idx].contained.data, elem.ptr, elem.len+1);
-        arr[idx].contained.meta = (elem.len << 1) | 1;
+        arr[idx].contained.meta = ((uint8_t) elem.len << 1) | 1;
     } else {
         arr[idx].spilled.ptr = (char*) malloc(elem.len+1);
         if (arr[idx].spilled.ptr == NULL) return false;
