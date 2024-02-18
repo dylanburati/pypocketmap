@@ -116,8 +116,6 @@ typedef packed_str_t pv_t;
 #endif
 
 const double PEAK_LOAD = 0.79;
-const char* const _EMPTY_STR_PTR = "";
-const str_t EMPTY_STR = { .ptr = _EMPTY_STR_PTR, .len = 0 };
 
 typedef struct {
     uint64_t *flags;  // each 8 bits refers to a bucket; see simd constants

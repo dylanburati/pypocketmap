@@ -59,7 +59,7 @@ half_configs = [
         "typeTag": "TYPE_TAG_STR",
         "disp": "str",
         "type": "char*",
-        "zero": "EMPTY_STR",
+        "zero": '{ .ptr = "", .len = 0 }',
         "pycode": "O",
         "short_repr_size": 2,
     },
