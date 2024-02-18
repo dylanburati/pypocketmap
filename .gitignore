@@ -68,6 +68,6 @@ dkms.conf
 # LSP, editor, env
 .cache
 .vscode
-/.venv/
+/.venv*/
 /.tox/
 compile_commands.json

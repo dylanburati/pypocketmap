@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
 # skip musl and pypy
-skip = ["*-musllinux*", "pp*", "*-win_arm64"]
+skip = ["*-musllinux*", "cp36*", "cp37*", "pp*", "*-win_arm64"]
 test-command = "python -X dev -m unittest discover -s {project}/tests/unit"
+test-requires = ["deal", "hypothesis", "typing_extensions"]
 test-skip = ["*-macosx_universal2:arm64", "*-macosx_arm64"]
 build-frontend = "build"
 

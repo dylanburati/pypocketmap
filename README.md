@@ -16,7 +16,7 @@ The latest charts are at https://observablehq.com/@dylan-burati-ws/pypocketmap-b
 ### Installation and Building
 You can install using pip: `pip install pypocketmap`.
 
-Microdict is tested to work on Linux, Mac OSX, and Windows systems. You will need
+pypocketmap is tested to work on Linux, Mac OSX, and Windows systems. You will need
 GCC 7+ on linux/mac osx systems and Visual C++ 14+ compiler on Windows systems to
 build the package. For the best performance use on a 64 bit system.
 

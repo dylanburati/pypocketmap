@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Callable, Generic, Protocol, TypeVar, overload
 from typing_extensions import Self
 from collections.abc import Collection, Mapping
