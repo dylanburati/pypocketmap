@@ -162,6 +162,7 @@ static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
 
     h->size = 0;
     h->num_deleted = 0;
+    h->error_code = 0;
     h->is_map = is_map;
     h->flags = NULL;
     h->keys = NULL;

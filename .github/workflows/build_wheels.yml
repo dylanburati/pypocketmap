@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build_wheels:
-    if: github.ref == 'refs/heads/main'
+    if: "github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[nobuild]')"
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
