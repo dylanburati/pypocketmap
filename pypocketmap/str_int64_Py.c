@@ -156,25 +156,21 @@ static PyObject* item_iternext(iterObj* self) {
     return NULL;
 }
 
-static int destroyed_global = 0;
 /**
  * Called by the destructor for deleting the hashtable.
  */
 void _destroy(dictObj* self) {
     if (self->valid_ht) {
-        destroyed_global += 1;
         mdict_destroy(self->ht);
         self->valid_ht = false;
     }
 }
 
-static int created_global = 0;
 /**
  * Called by the constructor for allocating and initializing the hashtable.
  */
 void _create(dictObj* self, uint32_t num_buckets){
     if (!self->valid_ht) {
-        created_global += 1;
         self->ht = mdict_create(num_buckets, true);
         self->valid_ht = true;
     }
