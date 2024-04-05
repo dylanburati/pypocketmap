@@ -88,7 +88,7 @@ class MyBuildCommand(BuildCommand):
             if not returns_success(self.compiler, src, ["-mavx2"]):
                 self.announce("[setup.py] failed check: -mavx2", logging.ERROR)
                 extra_p.remove("-mavx2")
-        ext.extra_compile_args = extra_c + extra_p + (ext.extra_compile_args or [])
+        # ext.extra_compile_args = extra_c + extra_p + (ext.extra_compile_args or [])
         self.announce(
             "[setup.py] compiler:{} compiler_family:{} plat_name:{} machine:{} machine_family:{} -> {!r}".format(
                 self.compiler.compiler_type,
