@@ -95,7 +95,7 @@ trait Value {
 
   // the `&` operator indicates something borrowed.
   // physically, both Self and &Self can be a struct { char* data, uint64_t len }
-  // semantically, &Self means that the data field is readonly, and its not safe
+  // semantically, &Self means that the data field is readonly, and it's not safe
   // to use the pointer once the source of the borrow is possibly freed/dropped.
   // ===
 
