@@ -142,7 +142,13 @@ static PyObject* item_iternext(iterObj* self) {
             k_t key = KEY_GET(h->keys, i);
             v_t val = VAL_GET(h->vals, i);
             self->iter_idx = i+1;
-            return PyTuple_Pack(2, PyUnicode_DecodeUTF8(key.ptr, key.len, NULL), PyFloat_FromDouble(val));
+            PyObject* key_obj = PyUnicode_DecodeUTF8(key.ptr, key.len, NULL);
+            PyObject* val_obj = PyFloat_FromDouble(val);
+            PyObject* item_obj = PyTuple_Pack(2, key_obj, val_obj);
+            // tuple should have the only reference to the key and value objects
+            Py_DECREF(key_obj);
+            Py_DECREF(val_obj);
+            return item_obj;
         }
     }
     PyErr_SetNone(PyExc_StopIteration);

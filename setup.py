@@ -129,7 +129,7 @@ with open("README.md") as fh:
 
 setup(
     name="pypocketmap",
-    version="0.0.1-beta",
+    version="0.0.1-rc1",
     author="Dylan Burati, Touqir Sajed",
     description="pypocketmap - a memory-efficient hashtable for CPython",
     long_description=long_description,
