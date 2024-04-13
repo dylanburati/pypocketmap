@@ -103,6 +103,10 @@ class MyBuildCommand(BuildCommand):
         super().build_extension(ext)
 
 
+module_int64_int64 = Extension(
+    "int64_int64",
+    sources=[os.path.join(parent_dir, "int64_int64_Py.c")]
+)
 module_str_float32 = Extension(
     "str_float32",
     sources=[os.path.join(parent_dir, "str_float32_Py.c")]
@@ -151,6 +155,7 @@ setup(
         ],
         "pypocketmap._pkt_c": [
             "__init__.py",
+            "int64_int64.pyi",
             "str_float32.pyi",
             "str_float64.pyi",
             "str_int32.pyi",
@@ -159,6 +164,7 @@ setup(
         ],
     },
     ext_modules=[
+        module_int64_int64,
         module_str_float32,
         module_str_float64,
         module_str_int32,

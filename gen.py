@@ -231,6 +231,7 @@ else:
     raise ValueError()
 first_config["keep"] = True
 src_configs = [c for c in src_configs if c != first_config]
+src_configs.append({"key": half_configs[1], "val": half_configs[1]})
 src_sanity, *src_outs = fill_templates([first_config, *src_configs], src_lines)
 if src_sanity != src_lines:
     import pdb
