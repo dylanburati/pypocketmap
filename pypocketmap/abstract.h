@@ -31,7 +31,20 @@ typedef int64_t pk_t;
 #define KEY_GET(arr, idx) packed_get_i64(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_i64(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_i64(arr, idx)
-static inline uint32_t _hash_func(k_t key) { return ((uint32_t) key) ^ ((uint32_t) (key >> 32)); }
+static inline uint32_t _hash_func(k_t key) {
+    // originally this was just (high bits xor low bits); however we need
+    // `entry.h2 == query_h2` to correlate very strongly with `entry == query`,
+    // which is broken if the keys are fairly dense: all of
+    // [a*128, (a+GROUP_SIZE)*128) has the same initial search group `a % num_groups`.
+    //
+    // resize_rehash also took way longer before this but I don't have an explanation
+
+    // https://github.com/cbreeden/fxhash/blob/master/lib.rs
+    uint32_t state = (uint32_t) key;
+    state *= 0x9e3779b9UL;
+    state = (state << 5) ^ ((uint32_t) (key >> 32));
+    return state * 0x9e3779b9UL;
+}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;

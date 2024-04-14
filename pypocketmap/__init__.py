@@ -1,5 +1,5 @@
 from enum import Enum
-from _pkt_c import str_float32, str_float64, str_int32, str_int64, str_str
+from _pkt_c import int64_int64, str_float32, str_float64, str_int32, str_int64, str_str
 
 class dtype(Enum):
     int32 = 1
@@ -28,4 +28,7 @@ def create(key_type, value_type):
             return str_float64.create()
         if value_type == string_ or value_type is str:
             return str_str.create()
+    if key_type == int64_ or key_type is int:
+        if value_type == int64_ or value_type is int:
+            return int64_int64.create()
     raise NotImplementedError()
