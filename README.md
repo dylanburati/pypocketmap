@@ -1,7 +1,7 @@
 # pypocketmap
 
-NOTE: this package is in beta. The current repo only contains implementations
-for string-keyed maps.
+NOTE: this package is in beta. The current repo contains implementations
+for these key/value combinations: `[str, _]` and `[i64, i64]`.
 
 A high performance python hash table library that consumes significantly less
 memory than Python Dictionaries. It currently supports Python 3.6+. It is forked from
@@ -28,7 +28,7 @@ The following code snippet shows common uses of the library.
 
 # Generates a dictionary with string keys and signed 64 bit integer values.
 >>> d = pkm.create(str, int)
->>> d = pkm.create(pkm.string, pkm.i64)  # or explicitly
+>>> d = pkm.create(pkm.string_, pkm.int64_)  # or explicitly
 
 # Works just like a python dictionary, although insertion order != iteration order
 >>> d["a"] = 2

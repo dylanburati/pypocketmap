@@ -260,6 +260,10 @@ class BaseHypothesisTest:
         hypothesis_update_dict()
 
 
+class Int64Int64HypothesisTest(BaseHypothesisTest, unittest.TestCase):
+    item_type = (pkm.int64_, pkm.int64_)
+
+
 class StrInt32HypothesisTest(BaseHypothesisTest, unittest.TestCase):
     item_type = (pkm.string_, pkm.int32_)
 
