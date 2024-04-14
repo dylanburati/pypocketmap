@@ -129,7 +129,7 @@ typedef packed_str_t pv_t;
 
 #endif
 
-const double PEAK_LOAD = 0.84;
+const double PEAK_LOAD = 0.79;
 const char* const EMPTY_STR = "";
 
 typedef struct {
