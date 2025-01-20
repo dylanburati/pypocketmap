@@ -71,3 +71,4 @@ dkms.conf
 /.venv*/
 /.tox/
 compile_commands.json
+.ccls-cache
