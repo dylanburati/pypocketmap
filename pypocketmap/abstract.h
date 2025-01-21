@@ -18,20 +18,23 @@
 #if KEY_TYPE_TAG == TYPE_TAG_I32
 typedef int32_t k_t;
 typedef int32_t pk_t;
+typedef struct{} hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_i32(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_i32(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_i32(arr, idx)
-static inline uint32_t _hash_func(k_t key) { return (uint32_t) key; }
+static inline uint32_t _hash_func(hasher_t* _, k_t key) { return (uint32_t) key; }
+static inline void _hasher_init() {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t k_t;
 typedef int64_t pk_t;
+typedef struct{} hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_i64(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_i64(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_i64(arr, idx)
-static inline uint32_t _hash_func(k_t key) {
+static inline uint32_t _hash_func(hasher_t* _, k_t key) {
     // originally this was just (high bits xor low bits); however we need
     // `entry.h2 == query_h2` to correlate very strongly with `entry == query`,
     // which is broken if the keys are fairly dense: all of
@@ -45,44 +48,54 @@ static inline uint32_t _hash_func(k_t key) {
     state = (state << 5) ^ ((uint32_t) (key >> 32));
     return state * 0x9e3779b9UL;
 }
+static inline void _hasher_init() {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;
 typedef float pk_t;
+typedef struct{} hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_f32(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_f32(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_f32(arr, idx)
-static inline uint32_t _hash_func(k_t key) {
+static inline uint32_t _hash_func(hasher_t* _, k_t key) {
     uint32_t ikey = *((uint32_t*) &key);
     return ikey ^ (ikey >> 16);
 }
+static inline void _hasher_init() {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_F64
 typedef double k_t;
 typedef double pk_t;
+typedef struct{} hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_f64(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_f64(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_f64(arr, idx)
-static inline uint32_t _hash_func(k_t key) {
+static inline uint32_t _hash_func(hasher_t* _, k_t key) {
     uint64_t ikey64 = *((uint64_t*) &key);
     uint32_t ikey = ((uint32_t) ikey) ^ ((uint32_t) (ikey >> 32))
     return ikey ^ (ikey >> 16);
 }
+static inline void _hasher_init() {}
 
 #elif KEY_TYPE_TAG == TYPE_TAG_STR
+#include "./polymur-hash.h"
+
 typedef str_t k_t;
 typedef packed_str_t pk_t;
+typedef PolymurHashParams hasher_t;
 #define KEY_EQ(a, b) ((a.len == b.len) && memcmp(a.ptr, b.ptr, a.len) == 0)
 #define KEY_GET(arr, idx) packed_get_str(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_str(arr, idx, elem)
 #define KEY_UNSET(arr, idx) packed_unset_str(arr, idx)
 #define KEYS_POINT 1
-#include "./wyhash.h"
-const uint64_t transparent_xor[5] = {0, 0, 0, 0, 0};
-static inline uint32_t _hash_func(k_t key) {
-    return (uint32_t) (wyhash((void*) key.ptr, key.len, 1, transparent_xor));
+
+static inline uint32_t _hash_func(hasher_t* hasher, k_t key) {
+    return (uint32_t) (polymur_hash((uint8_t*) key.ptr, key.len, hasher, 0));
+}
+static inline void _hasher_init(hasher_t* hasher) {
+    polymur_init_params_from_seed(hasher, 0xfedbca9876543210ULL);
 }
 #endif
 
@@ -143,6 +156,7 @@ typedef struct {
     uint32_t grow_threshold;  // size below this threshold when hitting upper_bound means rehash at eq num_buckets
     int error_code;
     bool is_map;
+    hasher_t hasher;
 } h_t;
 
 static inline bool _bucket_is_live(const uint64_t *flags, uint32_t i) {
@@ -157,7 +171,6 @@ static inline void _bucket_set(uint64_t *flags, uint32_t i, uint8_t v) {
     uint64_t v_shifted = ((uint64_t) v) << (8*(i&7));
     uint64_t set_mask = 0xffULL << (8*(i&7));
     flags[i>>3] ^= (flags[i>>3] ^ v_shifted) & set_mask;
-    return;
 }
 
 static inline uint32_t _flags_size(uint32_t num_buckets) {
@@ -177,6 +190,7 @@ static h_t* mdict_create(uint32_t num_buckets, bool is_map) {
     h->num_deleted = 0;
     h->error_code = 0;
     h->is_map = is_map;
+    _hasher_init(&h->hasher);
     h->flags = NULL;
     h->keys = NULL;
     h->vals = NULL;
@@ -309,7 +323,7 @@ static void _mdict_resize_rehash(h_t* h, uint32_t new_num_buckets) {
             if (h->is_map) {
                 val = h->vals[j];
             }
-            uint32_t hash = _hash_func(KEY_GET(h->keys, j));
+            uint32_t hash = _hash_func(&h->hasher, KEY_GET(h->keys, j));
             uint32_t flags_index = (hash >> 7) & new_mask;
             uint32_t h2 = hash & 0x7f;
             uint32_t step = step_basis;
@@ -383,7 +397,7 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, pv_t* val_box, bool shoul
         }
     }
 
-    uint32_t hash = _hash_func(key);
+    uint32_t hash = _hash_func(&h->hasher, key);
     // copy of _mdict_read_index, but modified to SIMD store after break
     uint32_t h2 = hash & 0x7f;
     const uint32_t step_basis = GROUP_WIDTH >> 3;
@@ -438,7 +452,7 @@ static inline bool mdict_set(h_t* h, k_t key, v_t val, pv_t* val_box, bool shoul
 }
 
 static inline bool mdict_prepare_remove(h_t* h, k_t key, uint32_t* idx_box) {
-    uint32_t hash = _hash_func(key);
+    uint32_t hash = _hash_func(&h->hasher, key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
         return false;
@@ -473,7 +487,7 @@ static inline void mdict_remove_item(h_t* h, uint32_t idx) {
 }
 
 static inline bool mdict_get(h_t* h, k_t key, v_t* val_box) {
-    uint32_t hash = _hash_func(key);
+    uint32_t hash = _hash_func(&h->hasher, key);
     int32_t idx = _mdict_read_index(h, key, hash >> 7, hash & 0x7f);
     if (idx < 0) {
         return false;
@@ -484,6 +498,6 @@ static inline bool mdict_get(h_t* h, k_t key, v_t* val_box) {
 }
 
 static inline bool mdict_contains(h_t* h, k_t key) {
-    uint32_t hash = _hash_func(key);
+    uint32_t hash = _hash_func(&h->hasher, key);
     return _mdict_read_index(h, key, hash >> 7, hash & 0x7f) >= 0;
 }

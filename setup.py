@@ -150,8 +150,8 @@ setup(
             "flags.h",
             "optimization.h",
             "packed.h",
+            "polymur-hash.h",
             "simd.h",
-            "wyhash.h",
         ],
         "pypocketmap._pkt_c": [
             "__init__.py",

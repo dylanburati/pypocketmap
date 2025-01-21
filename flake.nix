@@ -15,13 +15,17 @@
         pypocketmap = pkgs.python312Packages.buildPythonPackage {
           name = "pypocketmap";
           src = ./.;
-          propagatedBuildInputs = [ pkgs.python3Packages.setuptools ];
+          propagatedBuildInputs = [ pkgs.python312Packages.setuptools ];
         };
 
         pythonDerivation = (pkgs.python312.withPackages (pyPkgs: with pyPkgs; [
           black
+          (deal.overrideAttrs { doCheck = false; doInstallCheck = false; })
+          hypothesis
           numpy
           tox
+          typing-extensions
+
           pypocketmap
         ]));
 
