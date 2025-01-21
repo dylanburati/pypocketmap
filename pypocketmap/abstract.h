@@ -18,7 +18,7 @@
 #if KEY_TYPE_TAG == TYPE_TAG_I32
 typedef int32_t k_t;
 typedef int32_t pk_t;
-typedef struct{} hasher_t;
+typedef bool hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_i32(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_i32(arr, idx, elem)
@@ -29,7 +29,7 @@ static inline void _hasher_init() {}
 #elif KEY_TYPE_TAG == TYPE_TAG_I64
 typedef int64_t k_t;
 typedef int64_t pk_t;
-typedef struct{} hasher_t;
+typedef bool hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_i64(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_i64(arr, idx, elem)
@@ -53,7 +53,7 @@ static inline void _hasher_init() {}
 #elif KEY_TYPE_TAG == TYPE_TAG_F32
 typedef float k_t;
 typedef float pk_t;
-typedef struct{} hasher_t;
+typedef bool hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_f32(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_f32(arr, idx, elem)
@@ -67,7 +67,7 @@ static inline void _hasher_init() {}
 #elif KEY_TYPE_TAG == TYPE_TAG_F64
 typedef double k_t;
 typedef double pk_t;
-typedef struct{} hasher_t;
+typedef bool hasher_t;
 #define KEY_EQ(a, b) ((a) == (b))
 #define KEY_GET(arr, idx) packed_get_f64(arr, idx)
 #define KEY_SET(arr, idx, elem) packed_set_f64(arr, idx, elem)
@@ -155,8 +155,8 @@ typedef struct {
     uint32_t upper_bound;  // floor(PEAK_LOAD * num_buckets)
     uint32_t grow_threshold;  // size below this threshold when hitting upper_bound means rehash at eq num_buckets
     int error_code;
-    bool is_map;
     hasher_t hasher;
+    bool is_map;
 } h_t;
 
 static inline bool _bucket_is_live(const uint64_t *flags, uint32_t i) {
