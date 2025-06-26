@@ -31,7 +31,7 @@
 
         commonArgs = {
           buildInputs = [
-            pkgs.gcc13
+            pkgs.gcc14
             pkgs.gnumake
             pythonDerivation
             proccorder.packages.${system}.default
@@ -46,6 +46,7 @@
           packages = with pkgs; [
             bear
             ccls
+            pyright
             pythonDerivation
             proccorder.packages.${system}.default
           ];
